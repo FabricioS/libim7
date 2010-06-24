@@ -8,11 +8,11 @@
 import os
 from distutils.core import setup, Extension
 
-name = 'libim7'
+name = 'im7'
 version = 0.1
 
 setup(name=name, version=version, \
-    ext_modules=[Extension(name, 
+    ext_modules=[Extension('_'+name, 
         sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
         libraries=['z',],\
         define_macros=[('_LINUX', None), ], \

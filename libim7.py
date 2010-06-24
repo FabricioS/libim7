@@ -1,8 +1,22 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+#Copyright (C) 2010 Fabricio Silva
+
+"""
+This project intends to provide a simple pythonic interface to read 
+Particle Image Velocimetry (PIV) image and vector fields files created 
+by LaVision Davis software.
+It bases on ctypes to build an object-oriented interface to their C library.
+"""
+
 import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as nct
 
-mylib = ct.cdll.LoadLibrary("/home/fab/Trabajo/src/ReadIM7/_ReadIM7.so")
+import os
+path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7.so")
+mylib = ct.cdll.LoadLibrary(path)
 char16 = ct.c_char*16
 word = ct.c_ushort
 byte = ct.c_ubyte
@@ -134,11 +148,11 @@ class Buffer(ct.Structure):
             raise AttributeError(u"Does not have %s atribute" % key)
     
     def get_positions(self):
-        def apply_scale(N, scale):
-            return np.arange(N)*scale.factor+scale.offset
+        def scale(N, scale, grid):
+            return np.arange(.5, N)*scale.factor*grid+scale.offset
         
-        self.x = apply_scale(self.nx, self.scaleX)
-        self.y = apply_scale(self.ny, self.scaleY)
+        self.x = scale(self.header.sizeX, self.scaleX, self.buf.vectorGrid)
+        self.y = scale(self.header.sizeY, self.scaleY, self.buf.vectorGrid)
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
