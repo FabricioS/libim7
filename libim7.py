@@ -1,20 +1,38 @@
+import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as nct
 
-#mylib = ct.cdll.LoadLibrary("./libReadIM7.so")
-mylib = nct.load_library("libim7", ".")
-
+mylib = ct.cdll.LoadLibrary("/home/fab/Trabajo/src/ReadIM7/_ReadIM7.so")
 char16 = ct.c_char*16
 word = ct.c_ushort
-floatarr = nct.ndpointer(dtype=ct.c_float, flags='C_CONTIGUOUS')
-wordarr = nct.ndpointer(dtype=ct.c_ushort, flags='C_CONTIGUOUS')
+byte = ct.c_ubyte
+
+# Error code returned by ReadIM7 C function
+ImErr = {
+    'IMREAD_ERR_NO':0,     'IMREAD_ERR_FILEOPEN':1, \
+    'IMREAD_ERR_HEADER':2, 'IMREAD_ERR_FORMAT':3, \
+    'IMREAD_ERR_DATA':4,   'IMREAD_ERR_MEMORY':5}
+
+# Code for the buffer format
+Formats = {
+    'Formats_NOTUSED':-1, 'FormatsMEMPACKWORD':-2, \
+    'FormatsFLOAT': -3,   'FormatsWORD':-4, \
+    'FormatsDOUBLE':-5,   'FormatsFLOAT_VALID':-6, \
+    'FormatsIMAGE':0,     'FormatsVECTOR_2D_EXTENDED':1, \
+    'FormatsVECTOR_2D':2, 'FormatsVECTOR_2D_EXTENDED_PEAK':3,	\
+	'FormatsVECTOR_3D':4, 'FormatsVECTOR_3D_EXTENDED_PEAK':5,	\
+    'FormatsCOLOR':-10,   'FormatsRGB_MATRIX':-10, \
+    'FormatsRGB_32':-11}
+    
 class BufferScale(ct.Structure):
+    " Linear scaling tranform. "
     _fields_ = [("factor", ct.c_float), ("offset", ct.c_float),
                 ("description", char16), ("unit", char16)]
     _fnames_ = map(lambda x: x[0], _fields_)
     
     def _get_fdict(self):
-        return dict(map(lambda x: (x[0], self.__getattribute__(x[0])), self._fields_))
+        return dict( \
+            map(lambda x: (x[0], self.__getattribute__(x[0])), self._fields_))
     _fdict_ = property(_get_fdict)
     
     def __repr__(self):
@@ -37,6 +55,21 @@ class BufferScale(ct.Structure):
         mylib.SetBufferScale(ct.byref(self), dic["factor"], dic["offset"], \
             ct.c_char_p(dic["description"]), ct.c_char_p(dic["unit"]))
 
+class ImageHeader7(ct.Structure):
+    _fields_ = [ \
+        ("version", ct.c_short), \
+        ("pack_type", ct.c_short), \
+        ("buffer_format", ct.c_short), \
+        ("isSparse", ct.c_short), \
+        ("sizeX", ct.c_int), \
+        ("sizeY", ct.c_int), \
+        ("sizeZ", ct.c_int), \
+        ("sizeF", ct.c_int), \
+        ("scalarN", ct.c_short),  \
+        ("vector_grid", ct.c_short),  \
+        ("extraFlags", ct.c_short), \
+        ("reserved", ct.c_byte*(256-30))]
+
 class _Data(ct.Union):
     _fields_ = [("floatArray", ct.POINTER(ct.c_float)), \
                 ("wordArray",  ct.POINTER(ct.c_ushort))]
@@ -53,9 +86,20 @@ class Buffer(ct.Structure):
         ("scaleX", BufferScale), \
         ("scaleY", BufferScale), \
         ("scaleI", BufferScale)]
-        
+
+    def read_header(self):
+        f = file(self.file, 'rb')
+        tmp = f.read(ct.sizeof(ImageHeader7))
+        f.close()
+        self.header = ImageHeader7()
+        ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
+            ct.sizeof(ImageHeader7))
+    
     def get_array(self):
-        # while nct.prep_pointer is not available on debian unstable
+        """ 
+        Prepare data pointer to behave as a numpy array.
+        rem: Should become obsolete with nct.prep_pointer.
+        """
         try:
             self.array.__array_interface__
             return np.array(self.array, copy=False)
@@ -73,26 +117,125 @@ class Buffer(ct.Structure):
             'typestr' : nct._dtype(type(arr.contents)).str}
         return np.array(arr, copy=False)
 
+    def __getattr__(self, key):
+        if key=='header':
+            self.read_header()
+            return self.header
+        elif key=='blocks':
+            self.get_blocks()
+            return self.blocks
+        elif key in ('x', 'y'):
+            self.get_positions()
+            return self.__dict__[key]
+        elif key in ('vx', 'vy', 'vz', 'vmag'):
+            self.get_components()
+            return self.__dict__[key]
+        else:
+            raise AttributeError(u"Does not have %s atribute" % key)
+    
+    def get_positions(self):
+        def apply_scale(N, scale):
+            return np.arange(N)*scale.factor+scale.offset
+        
+        self.x = apply_scale(self.nx, self.scaleX)
+        self.y = apply_scale(self.ny, self.scaleY)
+        
+    def get_blocks(self):
+        " Transforms the concatenated blocks into arrays."
+        h = self.header
+        arr = self.get_array()       
+        if h.buffer_format==Formats['FormatsIMAGE']:
+            self.blocks = arr.reshape((h.sizeZ*h.sizeF, h.sizeY, h.sizeX))
+        elif h.buffer_format>=1 and h.buffer_format<=5:
+            nblocks = (9, 2, 10, 3, 14)
+            nblocks = nblocks[h.buffer_format-1]
+            self.blocks = arr.reshape((-1, h.sizeY, h.sizeX))
+        else:
+            raise TypeError(u"Can't get blocks from this buffer format.")
+    
+    def get_components(self):
+        """
+        Extract the velocity components from the various blocks stored in
+        Davis files according to values in the header.
+        """
+        h = self.header
+        b = self.blocks     
+        if h.buffer_format==Formats['FormatsVECTOR_2D']:
+            self.vx = b[0,:,:]
+            self.vy = b[1,:,:]
+            self.vz = np.zeros_like(self.vx)
+        elif h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED']:
+            choice = np.array(b[0,:,:], dtype=int)
+            self.vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
+            self.vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
+            self.vz = np.zeros_like(self.vx)
+        elif  h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED_PEAK']:
+            choice = np.array(b[0,:,:], dtype=int)
+            self.vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
+            self.vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
+            self.vz = np.zeros_like(self.vx)
+            self.peak = b[9,:,:]
+        elif h.buffer_format==Formats['FormatsVECTOR_3D']:
+            self.vx = b[0,:,:]
+            self.vy = b[1,:,:]
+            self.vz = b[2,:,:]
+        elif  h.buffer_format==Formats['FormatsVECTOR_3D_EXTENDED_PEAK']:
+            choice = np.array(b[0,:,:], dtype=int)
+            self.vx = np.choose(choice, (b[1,:,:], b[4,:,:], b[7,:,:], b[10,:,:], b[10,:,:], b[10,:,:]))
+            self.vy = np.choose(choice, (b[2,:,:], b[5,:,:], b[8,:,:], b[11,:,:], b[11,:,:], b[11,:,:]))
+            self.vz = np.choose(choice, (b[3,:,:], b[6,:,:], b[9,:,:], b[12,:,:], b[12,:,:], b[12,:,:]))
+            self.peak = b[13,:,:]
+        else:
+            pass
+        self.vmag = np.sqrt(self.vx**2+self.vy**2+self.vz**2)
+    
+    def filter(self, fun=None, arrays=[]):
+        """
+        Mask vector fields with the result of the application of function fun
+        taking a buffer as input argument. Returns velocity components
+        as masked arrays, and may apply same process to other array arguments.
+        """
+        idx = fun(self)
+        ff = lambda m: np.ma.array(m, mask=idx)
+        lArrays = [self.vx, self.vy, self.vz]
+        for tmp in arrays:
+            if tmp.shape == self.vx.shape:
+                lArrays.append(tmp)
+            else:
+                raise ValueError(u'Wrong shape for additional argument.')
+        return map(ff, lArrays)
+    
+    def quiver_xyplane(self, ax=None, sep=1):
+        ax = quiver_3d(self.x, self.y, self.vx, self.vy, self.vz, ax, sep)
+    
+            
 class AttributeList(ct.Structure):
     pass
 AttributeList._fields_ = [("name", ct.c_char_p), ("value", ct.c_char_p), \
     ("next", ct.POINTER(AttributeList))]
+def AttList_to_dict(att):
+    dic = {}
+    while att!=0:
+        try:
+            dic[att.name] = att.value
+            att = att.next
+        except AttributeError:
+            break
+    return dic
+AttributeList.todict = AttList_to_dict
 
-(IMREAD_ERR_NO, IMREAD_ERR_FILEOPEN, IMREAD_ERR_HEADER, IMREAD_ERR_FORMAT, \
-    IMREAD_ERR_DATA, IMREAD_ERR_MEMORY) = range(6)
-
-def imread_errcheck(retval, func, *args):
+def imread_errcheck(retval, func, args):
     if func.__name__!="ReadIM7":
         raise ValueError(u"Wrong function passed: %s." % func.__name__)
-    if retval==IMREAD_ERR_FILEOPEN:
+    if retval==ImErr['IMREAD_ERR_FILEOPEN']:
         raise IOError(u"Can't open file %s." % args[0])
-    elif retval==IMREAD_ERR_HEADER:
+    elif retval==ImErr['IMREAD_ERR_HEADER']:
         raise ValueError(u"Incorrect header in file %s." % args[0])
-    elif retval==IMREAD_ERR_FORMAT:
+    elif retval==ImErr['IMREAD_ERR_FORMAT']:
         raise IOError(u"Incorrect format in file %s." % args[0])
-    elif retval==IMREAD_ERR_DATA:
-        raise IOError(u"Error while reading data in %s." % args[0])
-    elif retval==IMREAD_ERR_MEMORY:
+    elif retval==ImErr['IMREAD_ERR_DATA']:
+        raise ValueError(u"Error while reading data in %s." % args[0])
+    elif retval==ImErr['IMREAD_ERR_MEMORY']:
         raise MemoryError(u"Out of memory while reading %s." % args[0])
     else:
         pass
@@ -108,35 +251,46 @@ def readim7(filename):
     mybuffer = Buffer()
     mylist = AttributeList()
     mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(mylist))
+    mybuffer.file = filename
     return mybuffer, mylist
 
-if __name__=='__main__':
-    scale = BufferScale(1., 0., "blabla", "mm")
-    scale.setbufferscale(2., 10, description="aze", unit='inches')
-    buf, att = readim7("test/B00001.VC7")
-    data = buf.get_array()
-    ny = 128
-    Nitype = 10
-    # plot
+def show_scalar_field(arr, extent=None, ax=None, colorbar=False):
     import matplotlib.pyplot as plt
+    if ax==None:
+        ax = plt.figure().add_subplot(111)
+    im = ax.imshow(arr, interpolation='nearest', aspect='equal', origin='lower', \
+        vmin=arr.min(), vmax=arr.max(), extent=extent)
+    if colorbar:
+        plt.colorbar(im)
+    return ax
+
+def quiver_3d(x,y,vx,vy,vz, ax=None, sep=1):
+    import matplotlib.pyplot as plt
+    if ax==None:
+        ax = plt.figure().add_subplot(111)
+    Q = ax.quiver(vy[::sep,::sep], vx[::sep,::sep], \
+        vz[::sep,::sep], pivot='mid')
+    qk = plt.quiverkey(Q, 0.9, 0.95, 5, r'$5 \frac{m}{s}$',
+               labelpos='E',
+               coordinates='figure',
+               fontproperties={'weight': 'bold'})
+    return ax
+
+if __name__=='__main__':
+    buf, att = readim7("./test/B00001.VC7")
+    
+    def myfilter(buf):
+        return buf.blocks[0,:,:]!=5
+#        V = buf.vmag
+#        mean, std = V.mean(), V.std()
+#        N = 1.5
+#        return np.logical_or(V<mean-N*std, V>mean+N*std)
+    
+    show_scalar_field(buf.blocks[0,:,:])
+    vx, vy, vz, vmag = buf.filter(myfilter, arrays=[buf.vmag,])
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
     plt.figure()
-    for n in xrange(Nitype/2-1):
-        plt.subplot(3,4,5+n)
-        plt.imshow(data[(2*n+1)*ny:(2*n+2)*ny, :])
-        plt.colorbar()
-        if n==0:
-            plt.ylabel('Vx')
-        plt.subplot(3,4,9+n)
-        plt.imshow(data[(2*n+2)*ny:(2*n+3)*ny, :])
-        plt.colorbar()
-        if n==0:
-            plt.ylabel('Vy')
-    plt.subplot(3,4,2)
-    plt.imshow(data[0:ny, :])
-    plt.ylabel('Choice')
-    plt.colorbar()
-    plt.subplot(3,4,4)
-    plt.imshow(data[(Nitype-1)*ny:, :])
-    plt.xlabel('Peak ratio')
+    plt.quiver(vx, vy, vmag, cmap=cm.jet)
     plt.colorbar()
     plt.show()
