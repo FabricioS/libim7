@@ -30,6 +30,9 @@
 
 #ifdef _LINUX
 #	define max(v1,v2)	(v1 > v2 ? v1 : v2)
+#else // Windows
+	// TL 21.04.09: strcpy_s Warnungen weg
+#	pragma warning (disable : 4996)
 #endif
 
 
@@ -213,10 +216,10 @@ Byte* Buffer_GetRowAddrAndSize( BufferType* myBuffer, int theRow, unsigned long 
 
 typedef enum 
 {
-	BIT8,			// compressed as 8 bit
+	BIT8,		// compressed as 8 bit
 	BIT4L,		// compressed to 4 bit left nibble
 	BIT4R,		// compressed to 4 bit right nibble
-	BIT16,		// n-uncompressed 2-byte pixels
+	BIT16		// n-uncompressed 2-byte pixels
 } CompressionMode_t;		// compression mode
 /* compression syntax:
 		BIT8: - At start lastvalue = 0 and cmode = BIT8, i.e. it is assumed
@@ -451,7 +454,10 @@ extern "C" int EXPORT ReadIMX ( const char* theFileName, BufferType* myBuffer, A
 	// set new size and type and allocate pixbuf memory
 	//Resize (header.columns, header.rows, IsFloat(), FALSE);
    if (header.imagetype==40)
+	{
+      fclose(theFile);
       return IMREAD_ERR_FORMAT;
+   }
       
    theNF = ((itsVersion>=VER_EXTHEADER && itsVersion<100) ? header.f_dim : 1);
    theNY = (header.rows==-1 ? header.longRows : header.rows);
@@ -459,7 +465,10 @@ extern "C" int EXPORT ReadIMX ( const char* theFileName, BufferType* myBuffer, A
 	theNZ = ((itsVersion>=VER_VOLUME_BUFFER && itsVersion<100) ? header.longZDim : 1);
 
 	if ( header.imagetype == IMAGE_SPARSE_WORD || header.imagetype == IMAGE_SPARSE_FLOAT )
+	{
+      fclose(theFile);
       return IMREAD_ERR_FORMAT;
+   }
 
 	if (itsVersion<VER_VOLUME_BUFFER || itsVersion>=100)
 	{
@@ -587,7 +596,10 @@ int ReadImgAttributes( FILE* theFile, AttributeList** myList )
          data = (char*)malloc(item.size+1);
          data[item.size] = 0; // final 0-byte for strings
          if (!fread(data,1,item.size,theFile))
+		{
+			free(data);
             return -1;  // "extended header: no tag data"
+		}
       }
 		if (data)
 		{
@@ -624,18 +636,21 @@ int ReadImgAttributes( FILE* theFile, AttributeList** myList )
 				SetAttribute(myList,"_DATE",data);
 				break;
 			case IEH_ATTRIBUTE:
-            {  char* value_pos = strchr(data,'=');
-               if (value_pos)
-					{
-                  *value_pos = '\0';
-                  SetAttribute( myList, data, value_pos+1 );
-               }
-               break;
+            {
+                char* value_pos = strchr(data,'=');
+                if (value_pos)
+				{
+                    *value_pos = '\0';
+                    SetAttribute( myList, data, value_pos+1 );
+                }
+                break;
             }
             default:
+            {
                 break;
-         }
-			free(data);
+            }
+            }
+		    free(data);
 		}
    }
    return 0;
@@ -816,29 +831,22 @@ inline void Compress16Bits( int n16bytes, signed char*& imx_bpageadr, long& imx_
 bool StoreImxOld( BufferType* myBuffer, int rowFirst, int rowLast, int maxCol, FILE *theFile )
 {
 	int theNX = myBuffer->nx;
-//	    theNY = myBuffer->ny,
-//		 theNZ = myBuffer->nz,
-//		 theNF = myBuffer->nf;
 
 	int BUFFERSIZE	= max( 2048, ((theNX+4096)/512) * 512 );	// n * sectorsize, size of packing memory
 	unsigned long BUFFERSAVE = 2 * theNX + 128;	// store memory when only this space is available (may not be enough for the next row)
-   char* page;//, *mbPage=NULL;
-//	unsigned long mbFree = 0;
-//	bool mbInBlock = false;
-	
+    char* page;	
 	page = (char*)malloc(sizeof(char)*BUFFERSIZE);
 	if ( page == NULL )
 		return true;
 
-	const Word *zeile;
-	Word newvalue;
-	long	lastvalueL;
-	signed char*	imx_bpageadr;
-	long				imx_bytecount;
-	int half, nbytes;								/* potential number of 4-bit pixels */
-	int n16bytes;                       	/* number of uncompressed pixels */
-	long diffvalue;
-
+	const Word  *zeile;
+	Word        newvalue;
+	long	    lastvalueL;
+	signed char* imx_bpageadr;
+	long		imx_bytecount;
+	int         half, nbytes;				/* potential number of 4-bit pixels */
+	int         n16bytes;                  	/* number of uncompressed pixels */
+	long        diffvalue;
 	imx_bpageadr = (signed char*) page;		/* running adress in byte page */
 	imx_bytecount = 0;
 

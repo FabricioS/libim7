@@ -17,13 +17,13 @@
 
 enum IM7PackType_t
 {
-	IM7_PACKTYPE__UNCOMPR= 0x1000,// autoselect uncompressed
+	IM7_PACKTYPE__UNCOMPR = 0x1000, // autoselect uncompressed
 	IM7_PACKTYPE__FAST,				// autoselect fastest packtype, 
 	IM7_PACKTYPE__SIZE,				// autoselect packtype with smallest resulting file
-	IM7_PACKTYPE_IMG			= 0,	// uncompressed, like IMG
-	IM7_PACKTYPE_IMX,					// old version compression, like IMX
+	IM7_PACKTYPE_IMG = 0,       	// uncompressed, like IMG
+	IM7_PACKTYPE_IMX,				// old version compression, like IMX
 	IM7_PACKTYPE_ZLIB,				// zlib
-	IM7_PACKTYPE_FIXED_12_0,		// 12 bit format without bitshift
+	IM7_PACKTYPE_FIXED_12_0 		// 12 bit format without bitshift
 };
 
 

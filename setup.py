@@ -16,5 +16,5 @@ setup(name=name, version=version, \
         sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
         libraries=['z',],\
         define_macros=[('_LINUX', None), ], \
-        extra_compile_args=['-ansi','-pedantic']
+        extra_compile_args=['-ansi', '-pedantic', '-g']
         )])
