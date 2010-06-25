@@ -15,7 +15,10 @@ import ctypes as ct
 import numpy.ctypeslib as nct
 
 import os
-path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7.so")
+try:
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7.so")
+except NameError:
+    path = "./_im7.so"
 mylib = ct.cdll.LoadLibrary(path)
 char16 = ct.c_char*16
 word = ct.c_ushort
@@ -51,10 +54,15 @@ class BufferScale(ct.Structure):
     
     def __repr__(self):
         tmp = self.description + " (%s)" % self.__class__
-        tmp += ":\n\t%.3f*n+%.3f" %(self.factor, self.offset)
+        tmp += ":\n\t(%.3f)*n+(%.3f)" %(self.factor, self.offset)
         if self.unit!="":
             tmp += " (%s)" % self.unit
         return tmp
+
+    def __call__(self, vector, grid):
+        if (isinstance(vector,int)):
+            vector = np.arange(.5, vector)
+        return vector*self.factor*grid+self.offset
     
     def setbufferscale(self, *args, **kwargs):
         latt = [tmp for tmp in self._fnames_ if not(tmp in kwargs.keys())]
@@ -138,7 +146,7 @@ class Buffer(ct.Structure):
         elif key=='blocks':
             self.get_blocks()
             return self.blocks
-        elif key in ('x', 'y'):
+        elif key in ('x', 'y', 'z'):
             self.get_positions()
             return self.__dict__[key]
         elif key in ('vx', 'vy', 'vz', 'vmag'):
@@ -148,11 +156,9 @@ class Buffer(ct.Structure):
             raise AttributeError(u"Does not have %s atribute" % key)
     
     def get_positions(self):
-        def scale(N, scale, grid):
-            return np.arange(.5, N)*scale.factor*grid+scale.offset
-        
-        self.x = scale(self.header.sizeX, self.scaleX, self.buf.vectorGrid)
-        self.y = scale(self.header.sizeY, self.scaleY, self.buf.vectorGrid)
+        self.x = self.scaleX(self.header.sizeX, self.vectorGrid)   
+        self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
+        self.z = np.arange(self.header.sizez)
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
@@ -163,7 +169,7 @@ class Buffer(ct.Structure):
         elif h.buffer_format>=1 and h.buffer_format<=5:
             nblocks = (9, 2, 10, 3, 14)
             nblocks = nblocks[h.buffer_format-1]
-            self.blocks = arr.reshape((-1, h.sizeY, h.sizeX))
+            self.blocks = arr.reshape((nblocks, h.sizeY, h.sizeX))
         else:
             raise TypeError(u"Can't get blocks from this buffer format.")
     
@@ -174,33 +180,37 @@ class Buffer(ct.Structure):
         """
         h = self.header
         b = self.blocks     
+        choice = (np.array(b[0,:,:], dtype=int)-1)%4
         if h.buffer_format==Formats['FormatsVECTOR_2D']:
-            self.vx = b[0,:,:]
-            self.vy = b[1,:,:]
-            self.vz = np.zeros_like(self.vx)
+            vx = b[0,:,:]
+            vy = b[1,:,:]
+            vz = np.zeros_like(vx)
         elif h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED']:
-            choice = np.array(b[0,:,:], dtype=int)
-            self.vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
-            self.vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
-            self.vz = np.zeros_like(self.vx)
+            vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
+            vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
+            vz = np.zeros_like(vx)
         elif  h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED_PEAK']:
-            choice = np.array(b[0,:,:], dtype=int)
-            self.vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
-            self.vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
-            self.vz = np.zeros_like(self.vx)
+            vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
+            vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
+            vz = np.zeros_like(vx)
             self.peak = b[9,:,:]
         elif h.buffer_format==Formats['FormatsVECTOR_3D']:
-            self.vx = b[0,:,:]
-            self.vy = b[1,:,:]
-            self.vz = b[2,:,:]
+            vx = b[0,:,:]
+            vy = b[1,:,:]
+            vz = b[2,:,:]
         elif  h.buffer_format==Formats['FormatsVECTOR_3D_EXTENDED_PEAK']:
-            choice = np.array(b[0,:,:], dtype=int)
-            self.vx = np.choose(choice, (b[1,:,:], b[4,:,:], b[7,:,:], b[10,:,:], b[10,:,:], b[10,:,:]))
-            self.vy = np.choose(choice, (b[2,:,:], b[5,:,:], b[8,:,:], b[11,:,:], b[11,:,:], b[11,:,:]))
-            self.vz = np.choose(choice, (b[3,:,:], b[6,:,:], b[9,:,:], b[12,:,:], b[12,:,:], b[12,:,:]))
+            vx = np.choose(choice, (b[1,:,:], b[4,:,:], b[7,:,:], b[10,:,:], b[10,:,:], b[10,:,:]))
+            vy = np.choose(choice, (b[2,:,:], b[5,:,:], b[8,:,:], b[11,:,:], b[11,:,:], b[11,:,:]))
+            vz = np.choose(choice, (b[3,:,:], b[6,:,:], b[9,:,:], b[12,:,:], b[12,:,:], b[12,:,:]))
             self.peak = b[13,:,:]
         else:
-            pass
+            raise TypeError(u"Object does not have a vector field format.")
+#        if self.scaleI.factor<0:
+#            self.scaleI.factor *= -1
+#            self.scaleI.offset *= -1
+        self.vx = self.scaleI(vx, 1.)
+        self.vy = self.scaleI(vy, 1.)
+        self.vz = self.scaleI(vz, 1.)
         self.vmag = np.sqrt(self.vx**2+self.vy**2+self.vz**2)
     
     def filter(self, fun=None, arrays=[]):
@@ -305,6 +315,6 @@ if __name__=='__main__':
     import matplotlib.pyplot as plt
     import matplotlib.cm as cm
     plt.figure()
-    plt.quiver(vx, vy, vmag, cmap=cm.jet)
+    plt.quiver(buf.x,buf.y,vx, vy, vmag, cmap=cm.jet)
     plt.colorbar()
     plt.show()
