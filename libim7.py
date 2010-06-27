@@ -158,7 +158,7 @@ class Buffer(ct.Structure):
     def get_positions(self):
         self.x = self.scaleX(self.header.sizeX, self.vectorGrid)   
         self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
-        self.z = np.arange(self.header.sizez)
+        self.z = 0 #np.arange(self.header.sizeZ)
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
@@ -179,7 +179,8 @@ class Buffer(ct.Structure):
         Davis files according to values in the header.
         """
         h = self.header
-        b = self.blocks     
+        b = self.blocks
+        ## TODO: check if there is still some magic behind choice.
         choice = (np.array(b[0,:,:], dtype=int)-1)%4
         if h.buffer_format==Formats['FormatsVECTOR_2D']:
             vx = b[0,:,:]
@@ -205,9 +206,6 @@ class Buffer(ct.Structure):
             self.peak = b[13,:,:]
         else:
             raise TypeError(u"Object does not have a vector field format.")
-#        if self.scaleI.factor<0:
-#            self.scaleI.factor *= -1
-#            self.scaleI.offset *= -1
         self.vx = self.scaleI(vx, 1.)
         self.vy = self.scaleI(vy, 1.)
         self.vz = self.scaleI(vz, 1.)
@@ -234,19 +232,33 @@ class Buffer(ct.Structure):
     
             
 class AttributeList(ct.Structure):
-    pass
-AttributeList._fields_ = [("name", ct.c_char_p), ("value", ct.c_char_p), \
+    def __getattr__(self, key):
+        if key=='pairs':
+            self.get_pairs()
+            return self.pairs
+        if key=='dict':
+            return self.as_dict()
+        else:
+            raise AttributeError(u"Does not have %s atribute" % key)
+            
+    def get_pairs(self):
+        att = self
+        self.pairs = []
+        while att!=0:
+            try:
+                self.pairs.append((att.name, att.value))
+                att = att.next[0]
+            except ValueError:
+                break
+    
+    def as_dict(self):
+        self.get_pairs()
+        return dict(self.pairs)
+        
+AttributeList._fields_ = [ \
+    ("name", ct.c_char_p), \
+    ("value", ct.c_char_p), \
     ("next", ct.POINTER(AttributeList))]
-def AttList_to_dict(att):
-    dic = {}
-    while att!=0:
-        try:
-            dic[att.name] = att.value
-            att = att.next
-        except AttributeError:
-            break
-    return dic
-AttributeList.todict = AttList_to_dict
 
 def imread_errcheck(retval, func, args):
     if func.__name__!="ReadIM7":
@@ -267,16 +279,17 @@ def imread_errcheck(retval, func, args):
 mylib.SetBufferScale.argtypes = [ct.POINTER(BufferScale), \
     ct.c_float, ct.c_float, ct.c_char_p, ct.c_char_p]
 mylib.SetBufferScale.restype = None
-mylib.ReadIM7.argtypes = [ct.c_char_p, ct.POINTER(Buffer), ct.POINTER(AttributeList)]
+mylib.ReadIM7.argtypes = [ct.c_char_p, ct.POINTER(Buffer), \
+    ct.POINTER(ct.POINTER(AttributeList))]
 mylib.ReadIM7.restype = ct.c_int
 mylib.ReadIM7.errcheck = imread_errcheck
 
 def readim7(filename):
     mybuffer = Buffer()
-    mylist = AttributeList()
-    mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(mylist))
+    att_pp = ct.pointer(AttributeList())
+    mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(att_pp))
     mybuffer.file = filename
-    return mybuffer, mylist
+    return mybuffer, att_pp[0]
 
 def show_scalar_field(arr, extent=None, ax=None, colorbar=False):
     import matplotlib.pyplot as plt

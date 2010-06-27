@@ -51,63 +51,57 @@
 #endif
 
 
-typedef struct		// image file header (256 Bytes)
-	{
-	 short int 	imagetype;      // 0:  (Image_t)
-	 short int	xstart;			// 2:  start-pos left, not used
-	 short int	ystart;			// 4:  start-pos top, not used
-	 Byte			extended[4];// 6:  reserved
-	 short int	rows;			// 10: total number of rows, if -1 the real number is stored in longRows
-	 short int	columns;		// 12: total number of columns, if -1 see longColumns
-	 short int  image_sub_type; // 14: type of image (int):
-								//				(included starting from sc_version 4.2 on)
+typedef struct // image file header (256 Bytes)
+{
+    short int 	imagetype;      // 0:  (Image_t)
+	short int	xstart;			// 2:  start-pos left, not used
+	short int	ystart;			// 4:  start-pos top, not used
+	Byte		extended[4];    // 6:  reserved
+	short int	rows;			// 10: total number of rows, if -1 the real number is stored in longRows
+	short int	columns;		// 12: total number of columns, if -1 see longColumns
+	short int   image_sub_type; // 14: type of image (int):
+								//	   (included starting from sc_version 4.2 on)
 								// 	0 = normal image
-								//		1 = PIV vector field with header and 4*2D field
-								//				rows = 9 * y-size
-								//		2 = simple 2D vector field (not used yet)
-								//				rows = 2 * y-size
-								//		3 ...
-	 short int 	y_dim;			// 16: size of y-dimension (size of x-dimension is always = columns), not used
-	 short int 	f_dim;			// 18: size of f-dimension (number of frames)
-
-	 // for image_sub_type 1/2 only:
-	 short int	vector_grid; 	// 20: 1-n = vector data: grid size
-								//     		(included starting from sc_version 4.2 on)
-	 char			ext[11];	// 22: reserved
-	 Byte			version;	// 33:  e.g. 120 = 1.2	300+ = 3.xx  40-99 = 4.0 bis 9.9
+								//	1 = PIV vector field with header and 4*2D field	rows = 9 * y-size
+								//	2 = simple 2D vector field (not used yet)	    rows = 2 * y-size
+								//	3 ...
+	short int 	y_dim;			// 16: size of y-dim (size of x-dim is always = columns), not used
+	short int 	f_dim;			// 18: size of f-dimension (number of frames)
+    // for image_sub_type 1/2 only:
+	short int	vector_grid; 	// 20: 1-n = vector data: grid size (included starting from sc_ver 4.2 on)
+	char		ext[11];	    // 22: reserved
+	Byte		version;	    // 33:  e.g. 120 = 1.2	300+ = 3.xx  40-99 = 4.0 bis 9.9
 #ifdef _WIN32
-	 char       date[9];        // 34	
-	 char       time[9];		// 43
+	char        date[9];        // 34	
+	char        time[9];		// 43
 #else
 //#message MIS-ALIGNED!!!
-	 char       date[8];        // 34	
-	 char       time[8];		// 43
+	char        date[8];        // 34	
+	char        time[8];		// 43
 #endif
-	 short int  xinit;          // 52:  x-scale values
+	short int   xinit;          // 52:  x-scale values
     float       xa;             // 54
     float       xb;             // 58
     char        xdim[11];       // 62
     char        xunits[11];     // 73
-	 short int  yinit;          // 84:  y-scale values
+	short int   yinit;          // 84:  y-scale values
     float       ya;             // 86
     float       yb;             // 90
     char        ydim[11];       // 94
     char        yunits[11];     // 105
-	 short int  iinit;          // 116: i-scale (intensity) values
+	short int   iinit;          // 116: i-scale (intensity) values
     float       ia;             // 118
     float       ib;             // 122
     char        idim[11];       // 126
     char        iunits[11];     // 137
-
-	 char       com1[40];       // 148: comment (2 lines)
-	 char       com2[40];		// 188
-
-	 int		longRows;	    // 228: (large) number of rows, TL 04.02.2000
-	 int		longColumns;    // 232: (large) number of columns, TL 04.02.2000
-     int		longZDim;		// 236: (large) number of z-dimension, TL 02.05.00
-	 char		reserved[12];   // 240: reserved
-	 int		checksum;	    // 252-255: not used
-	} image_header;
+    char        com1[40];       // 148: comment (2 lines)
+	char        com2[40];		// 188
+	int		    longRows;	    // 228: (large) number of rows, TL 04.02.2000
+	int		    longColumns;    // 232: (large) number of columns, TL 04.02.2000
+    int		    longZDim;		// 236: (large) number of z-dimension, TL 02.05.00
+	char		reserved[12];   // 240: reserved
+	int		    checksum;	    // 252-255: not used
+} image_header;
 
 
 #ifdef __BORLANDC__
@@ -522,28 +516,29 @@ errexit:
 /*****************************************************************************/
 
 typedef enum 
-	{
-      IEH_END = 0,
-      IEH_SCALE_X,
-      IEH_SCALE_Y,
-      IEH_SCALE_Z,
-      IEH_SCALE_I,
-      IEH_COMMENT,
-      IEH_ATTRIBUTE,
-      IEH_SCALE_F,
-      IEH_ATTRIBUTE_FLOATARRAY,
-      IEH_ATTRIBUTE_INTARRAY,
-      IEH_ATTRIBUTE_WORDARRAY,
-		IEH_TIME,						// long time with milliseconds, TL 24.10.00
-		// jetzt duerfen neue Attribute folgen, die bisherigen Daten versteht auch DaVis 6
-		IEH_DATE,
-		IEH_MAX = IEH_DATE			// max index of this list
-   } type_extheader;
+{
+    IEH_END = 0,
+    IEH_SCALE_X,
+    IEH_SCALE_Y,
+    IEH_SCALE_Z,
+    IEH_SCALE_I,
+    IEH_COMMENT,
+    IEH_ATTRIBUTE,
+    IEH_SCALE_F,
+    IEH_ATTRIBUTE_FLOATARRAY,
+    IEH_ATTRIBUTE_INTARRAY,
+    IEH_ATTRIBUTE_WORDARRAY,
+	IEH_TIME,		// long time with milliseconds, TL 24.10.00
+	// jetzt duerfen neue Attribute folgen, die bisherigen Daten versteht auch DaVis 6
+	IEH_DATE,
+	IEH_MAX = IEH_DATE			// max index of this list
+} type_extheader;
 
 typedef struct
-   {  type_extheader type;
-      int            size;
-   } image_extheader;
+{
+    type_extheader type;
+    int            size;
+} image_extheader;
 
 
 int SetAttribute( AttributeList** myList, const char* theName, const char* theValue )
@@ -586,21 +581,20 @@ void Attribute_BreakToNull( char* data, int size )
 
 int ReadImgAttributes( FILE* theFile, AttributeList** myList )
 {
-   image_extheader item;
-
-   while (fread((char*)&item,1,sizeof(item),theFile))
+    image_extheader item;
+    while (fread((char*)&item,1,sizeof(item),theFile))
 	{
-      char* data = NULL;
-      if (item.size>0)
+        char* data = NULL;
+        if (item.size>0)
 		{
-         data = (char*)malloc(item.size+1);
-         data[item.size] = 0; // final 0-byte for strings
-         if (!fread(data,1,item.size,theFile))
-		{
-			free(data);
-            return -1;  // "extended header: no tag data"
-		}
-      }
+            data = (char*)malloc(item.size+1);
+            data[item.size] = 0; // final 0-byte for strings
+            if (!fread(data,1,item.size,theFile))
+		    {
+			    free(data);
+                return -1;  // "extended header: no tag data"
+		    }
+        }
 		if (data)
 		{
 			switch (item.type) {

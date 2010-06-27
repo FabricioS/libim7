@@ -212,9 +212,10 @@ void Scale_Read( const char*theData, BufferScaleType* theScale )
 
 extern "C" int EXPORT ReadIM7 ( const char* theFileName, BufferType* myBuffer, AttributeList** myList )
 {
-	FILE* theFile = fopen(theFileName, "rb");				// open for binary read
+	FILE* theFile = fopen(theFileName, "rb");
+	// open for binary read
 	if (theFile==NULL)
-	   return IMREAD_ERR_FILEOPEN;
+	    return IMREAD_ERR_FILEOPEN;
 
 	// Read an image in our own IMX or IMG or VEC or VOL format
 	int theNX,theNY,theNZ,theNF;
@@ -222,13 +223,13 @@ extern "C" int EXPORT ReadIM7 ( const char* theFileName, BufferType* myBuffer, A
 	Image_Header_7 header;
 	if (!fread ((char*)&header, sizeof(header), 1, theFile))
 	{
-      fclose(theFile);
-      return IMREAD_ERR_HEADER;
-   }
+        fclose(theFile);
+        return IMREAD_ERR_HEADER;
+    }
 
 	switch (header.version)
 	{
-		case IMAGE_IMG:
+	    case IMAGE_IMG:
 		case IMAGE_IMX:
 		case IMAGE_FLOAT:
 		case IMAGE_SPARSE_WORD:
@@ -240,8 +241,8 @@ extern "C" int EXPORT ReadIM7 ( const char* theFileName, BufferType* myBuffer, A
 
 	if (header.isSparse)
 	{
-      fclose(theFile);
-      return IMREAD_ERR_FORMAT;
+        fclose(theFile);
+        return IMREAD_ERR_FORMAT;
 	}
 
 	theNX = header.sizeX;
@@ -254,14 +255,14 @@ extern "C" int EXPORT ReadIM7 ( const char* theFileName, BufferType* myBuffer, A
 		theNY *= compN[header.buffer_format];
 	}
 	bool bFloat = header.buffer_format!=BUFFER_FORMAT_WORD && header.buffer_format!=BUFFER_FORMAT_MEMPACKWORD;
-	CreateBuffer( myBuffer, theNX,theNY,theNZ,theNF, bFloat, header.vector_grid, (BufferFormat_t)header.buffer_format );
+	CreateBuffer(myBuffer,theNX,theNY,theNZ,theNF,bFloat,header.vector_grid,(BufferFormat_t)header.buffer_format);
 
 	ImReadError_t errret = IMREAD_ERR_NO;
 	//fprintf(stderr,"format=%i pack=%i\n",header.buffer_format,header.pack_type);
 	switch (header.pack_type)
 	{
 		case IM7_PACKTYPE_IMG:
-			errret = SCPackUncompressed_Read( theFile, myBuffer, header.buffer_format==BUFFER_FORMAT_MEMPACKWORD );
+			errret = SCPackUncompressed_Read(theFile,myBuffer, header.buffer_format==BUFFER_FORMAT_MEMPACKWORD);
 			break;
 		case IM7_PACKTYPE_IMX:
 			errret = SCPackOldIMX_Read(theFile,myBuffer);
@@ -280,9 +281,10 @@ extern "C" int EXPORT ReadIM7 ( const char* theFileName, BufferType* myBuffer, A
 	{
 		AttributeList* tmpAttrList = NULL;
 		AttributeList** useList = (myList!=NULL ? myList : &tmpAttrList);
-      ReadImgAttributes(theFile,useList);
+        ReadImgAttributes(theFile, useList);
 		AttributeList* ptr = *useList;
-		while (ptr!=NULL)
+		/*while (ptr!=NULL)*/
+		while (ptr->name!='\x00')
 		{
 			//fprintf(stderr,"%s: %s\n",ptr->name,ptr->value);
 			if (strncmp(ptr->name,"_SCALE_",7)==0)
