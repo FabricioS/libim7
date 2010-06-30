@@ -181,34 +181,64 @@ class Buffer(ct.Structure):
         h = self.header
         b = self.blocks
         ## TODO: check if there is still some magic behind choice.
-        choice = (np.array(b[0,:,:], dtype=int)-1)%4
+        choice = np.array(b[0,:,:], dtype=int)
         if h.buffer_format==Formats['FormatsVECTOR_2D']:
             vx = b[0,:,:]
             vy = b[1,:,:]
             vz = np.zeros_like(vx)
         elif h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED']:
-            vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
-            vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
-            vz = np.zeros_like(vx)
+            vx = np.zeros(choice.shape, dtype=float)
+            vy = np.zeros(choice.shape, dtype=float)
+            vz = np.zeros(choice.shape, dtype=float)
+            vx[choice==1] = b[1,:,:][choice==1]
+            vx[choice==2] = b[3,:,:][choice==2]
+            vx[choice==3] = b[5,:,:][choice==3]
+            vx[choice==4] = b[7,:,:][choice==4]
+            vy[choice==1] = b[2,:,:][choice==1]
+            vy[choice==2] = b[4,:,:][choice==2]
+            vy[choice==3] = b[6,:,:][choice==3]
+            vy[choice==4] = b[8,:,:][choice==4]
         elif  h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED_PEAK']:
-            vx = np.choose(choice, (b[1,:,:], b[3,:,:], b[5,:,:], b[7,:,:], b[7,:,:], b[7,:,:]))
-            vy = np.choose(choice, (b[2,:,:], b[4,:,:], b[6,:,:], b[8,:,:], b[8,:,:], b[8,:,:]))
-            vz = np.zeros_like(vx)
+            vx = np.zeros(choice.shape, dtype=float)
+            vy = np.zeros(choice.shape, dtype=float)
+            vz = np.zeros(choice.shape, dtype=float)
+            vx[choice==1] = b[1,:,:][choice==1]
+            vx[choice==2] = b[3,:,:][choice==2]
+            vx[choice==3] = b[5,:,:][choice==3]
+            vx[choice==4] = b[7,:,:][choice==4]
+            vy[choice==1] = b[2,:,:][choice==1]
+            vy[choice==2] = b[4,:,:][choice==2]
+            vy[choice==3] = b[6,:,:][choice==3]
+            vy[choice==4] = b[8,:,:][choice==4]
             self.peak = b[9,:,:]
         elif h.buffer_format==Formats['FormatsVECTOR_3D']:
             vx = b[0,:,:]
             vy = b[1,:,:]
             vz = b[2,:,:]
         elif  h.buffer_format==Formats['FormatsVECTOR_3D_EXTENDED_PEAK']:
-            vx = np.choose(choice, (b[1,:,:], b[4,:,:], b[7,:,:], b[10,:,:], b[10,:,:], b[10,:,:]))
-            vy = np.choose(choice, (b[2,:,:], b[5,:,:], b[8,:,:], b[11,:,:], b[11,:,:], b[11,:,:]))
-            vz = np.choose(choice, (b[3,:,:], b[6,:,:], b[9,:,:], b[12,:,:], b[12,:,:], b[12,:,:]))
+            vx = np.zeros(choice.shape, dtype=float)
+            vy = np.zeros(choice.shape, dtype=float)
+            vz = np.zeros(choice.shape, dtype=float)
+            vx[choice==1] = b[1,:,:][choice==1]
+            vx[choice==2] = b[4,:,:][choice==2]
+            vx[choice==3] = b[7,:,:][choice==3]
+            vx[choice==4] = b[10,:,:][choice==4]
+            vy[choice==1] = b[2,:,:][choice==1]
+            vy[choice==2] = b[5,:,:][choice==2]
+            vy[choice==3] = b[8,:,:][choice==3]
+            vy[choice==4] = b[11,:,:][choice==4]
+            vz[choice==1] = b[3,:,:][choice==1]
+            vz[choice==2] = b[6,:,:][choice==2]
+            vz[choice==3] = b[9,:,:][choice==3]
+            vz[choice==4] = b[12,:,:][choice==4]
             self.peak = b[13,:,:]
         else:
             raise TypeError(u"Object does not have a vector field format.")
         self.vx = self.scaleI(vx, 1.)
         self.vy = self.scaleI(vy, 1.)
         self.vz = self.scaleI(vz, 1.)
+        if self.scaleY.factor<0:
+            self.vy *= -1
         self.vmag = np.sqrt(self.vx**2+self.vy**2+self.vz**2)
     
     def filter(self, fun=None, arrays=[]):
