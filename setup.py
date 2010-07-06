@@ -6,24 +6,27 @@
 """
 """
 import sys,os
-from distutils.core import setup, Extension
-from distutils.command.build_ext import build_ext
+from numpy.distutils.core import setup, Extension
+from numpy.distutils.command.build_ext import build_ext
 
 name = 'im7'
 version = 0.1
 
 # Configure C and fortran compilers
 if sys.platform in ('win32', 'cygwin'):
-    build_ext.compiler = "mingw32"
-    build_ext.fcompiler = "gnu"
+    ext = Extension('_'+name, 
+        sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
+        include_dirs=['src'],\
+        libraries=['zlib',],\
+        library_dirs=['src'],\
+        define_macros=[('_WIN32', None), ], \
+        extra_compile_args=['-ansi', '-pedantic', '-g', '-v'])
 else:
-    build_ext.compiler = "unix"
-    build_ext.fcompiler = "gnu95"
-    
-setup(name=name, version=version, \
-    ext_modules=[Extension('_'+name, 
+    ext = Extension('_'+name, 
         sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
         libraries=['z',],\
         define_macros=[('_LINUX', None), ], \
-        extra_compile_args=['-ansi', '-pedantic', '-g']
-        )])
+        extra_compile_args=['-ansi', '-pedantic', '-g'])
+    
+setup(name=name, version=version, \
+    ext_modules=[ext])

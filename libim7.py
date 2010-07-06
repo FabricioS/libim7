@@ -9,16 +9,23 @@ Particle Image Velocimetry (PIV) image and vector fields files created
 by LaVision Davis software.
 It bases on ctypes to build an object-oriented interface to their C library.
 """
-
+import sys
 import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as nct
 
 import os
 try:
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7.so")
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7")
 except NameError:
-    path = "./_im7.so"
+    path = "./_im7"
+    
+if sys.platform in ('win32', 'cygwin'):
+    path += '.pyd'    
+else:
+    path += '.so'
+
+mylib = ct.windll.LoadLibrary(path)
 mylib = ct.cdll.LoadLibrary(path)
 char16 = ct.c_char*16
 word = ct.c_ushort

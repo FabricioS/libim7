@@ -5,7 +5,7 @@
 #ifdef _WIN32
 
 #include <windows.h>
-
+#	define EXPORT	__declspec(dllexport)
 #ifdef __BORLANDC__
 #	define EXPORT	_export
 #  pragma message ("This is a Borland compiler")
