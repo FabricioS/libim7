@@ -20,13 +20,12 @@ try:
 except NameError:
     path = "./_im7"
     
-if sys.platform in ('win32', 'cygwin'):
-    path += '.pyd'    
-else:
+if not(sys.platform in ('win32', 'cygwin')):
     path += '.so'
+    mylib = ct.cdll.LoadLibrary(path)
+else:
+    mylib = ct.cdll.LoadLibrary(path)
 
-mylib = ct.windll.LoadLibrary(path)
-mylib = ct.cdll.LoadLibrary(path)
 char16 = ct.c_char*16
 word = ct.c_ushort
 byte = ct.c_ubyte

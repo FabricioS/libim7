@@ -9,7 +9,19 @@
 #	else
 #		pragma pack (1)
 #	endif
+#include <windows.h>
+#ifdef BUILD_DLL
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT __declspec(dllimport)
+#endif
+#endif
 
+#ifdef _LINUX
+#	pragma message ("This is a Linux operating system")
+#	include <stdlib.h>
+#	include <string.h>
+#	define EXPORT
 #endif
 
 

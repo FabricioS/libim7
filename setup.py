@@ -14,19 +14,13 @@ version = 0.1
 
 # Configure C and fortran compilers
 if sys.platform in ('win32', 'cygwin'):
-    ext = Extension('_'+name, 
-        sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
-        include_dirs=['src'],\
-        libraries=['zlib',],\
-        library_dirs=['src'],\
-        define_macros=[('_WIN32', None), ], \
-        extra_compile_args=['-ansi', '-pedantic', '-g', '-v'])
+    ext = []
 else:
-    ext = Extension('_'+name, 
+    ext = [Extension('_'+name, 
         sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
         libraries=['z',],\
         define_macros=[('_LINUX', None), ], \
-        extra_compile_args=['-ansi', '-pedantic', '-g'])
+        extra_compile_args=['-ansi', '-pedantic', '-g']),]
     
 setup(name=name, version=version, \
-    ext_modules=[ext])
+    ext_modules=ext)

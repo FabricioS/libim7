@@ -2,32 +2,21 @@
 #define __READIMX_H
 
 
-#ifdef _WIN32
-
-#include <windows.h>
-#	define EXPORT	__declspec(dllexport)
-#ifdef __BORLANDC__
-#	define EXPORT	_export
-#  pragma message ("This is a Borland compiler")
-#endif
-
-#ifdef _MSC_VER
-#	define EXPORT	__declspec(dllexport)
-#  pragma message ("This is a Microsoft Visual C++ compiler")
-#endif
-
 #define READ_IM7
-
+#ifdef _WIN32
+#include <windows.h>
+#ifdef BUILD_DLL
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT __declspec(dllimport)
+#endif
 #endif
 
 #ifdef _LINUX
 #	pragma message ("This is a Linux operating system")
-
 #	include <stdlib.h>
 #	include <string.h>
-
 #	define EXPORT
-
 #endif
 
 
