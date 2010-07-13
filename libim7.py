@@ -334,12 +334,37 @@ mylib.DestroyBuffer.restype = None
 mylib.DestroyAttributeList.argtypes = [ct.POINTER(ct.POINTER(AttributeList)),]
 mylib.DestroyAttributeList.restype = None
 
-def readim7(filename):
+def readim7(filename, scale_warn= False):
     mybuffer = Buffer()
     att_pp = ct.pointer(AttributeList())
     mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(att_pp))
     mybuffer.file = filename
-    return mybuffer, att_pp[0]
+    att = att_pp[0]
+    def from_att(field):
+        tmp = getattr(mybuffer,field)
+        if getattr(tmp,'factor')==0 and getattr(tmp,'offset')==0:
+            if scale_warn:
+                print(u'%s not set in %s' % (field, filename))
+            if field=='scaleX':
+                attv = att.as_dict()['_SCALE_X']
+            elif field=='scaleY':
+                attv = att.as_dict()['_SCALE_Y']
+            elif field=='scaleI':
+                attv = att.as_dict()['_SCALE_I']
+            else:
+                return
+            vals = attv.split(' ')
+            setattr(tmp,'factor', float(vals[0]))
+            vals = vals[1].split('\n')
+            setattr(tmp,'offset', float(vals[0]))
+            setattr(tmp,'unit', vals[1])
+            setattr(tmp,'description', vals[2])
+            
+    from_att('scaleX')
+    from_att('scaleX')
+    from_att('scaleY')
+    from_att('scaleI')
+    return mybuffer, att
 
 del_buffer = lambda self: mylib.DestroyBuffer(ct.byref(self))
 del_attributelist = lambda self: mylib.DestroyAttributeList(ct.byref(ct.pointer(self)))
