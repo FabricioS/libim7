@@ -157,7 +157,7 @@ int CreateBuffer( BufferType* myBuffer, int theNX, int theNY, int theNZ, int the
 }
 
 
-void DestroyBuffer( BufferType* myBuffer )
+extern "C" void EXPORT DestroyBuffer( BufferType* myBuffer )
 {
 	if (myBuffer)
 	{
@@ -179,16 +179,18 @@ void DestroyBuffer( BufferType* myBuffer )
 }
 
 
-void DestroyAttributeList( AttributeList** myList )
+extern "C" void EXPORT DestroyAttributeList( AttributeList** myList )
 {
-	AttributeList* item;
-	while (*myList)
+	AttributeList* item = *myList;
+//	while (*myList)
+	while (item->name!='\x00')
 	{
-		item = *myList;
-		*myList = (*myList)->next;
+	    //fprintf(stderr,"%s: %s\n",item->name,item->value);
 		free(item->name);
 		free(item->value);
 		free(item);
+		*myList = (*myList)->next;
+		item = *myList;
 	}
 }
 

@@ -266,6 +266,11 @@ class Buffer(ct.Structure):
     def quiver_xyplane(self, ax=None, sep=1):
         ax = quiver_3d(self.x, self.y, self.vx, self.vy, self.vz, ax, sep)
     
+    def delete(self):
+        for key in ('x','y','z','vx','vy','vz','vmag','blocks'):
+            if hasattr(self, key):
+                setattr(self, key,None)
+        del_buffer(self)
             
 class AttributeList(ct.Structure):
     def __getattr__(self, key):
@@ -291,6 +296,9 @@ class AttributeList(ct.Structure):
         self.get_pairs()
         return dict(self.pairs)
         
+    def delete(self):
+        del_attributelist(self)
+        
 AttributeList._fields_ = [ \
     ("name", ct.c_char_p), \
     ("value", ct.c_char_p), \
@@ -315,10 +323,16 @@ def imread_errcheck(retval, func, args):
 mylib.SetBufferScale.argtypes = [ct.POINTER(BufferScale), \
     ct.c_float, ct.c_float, ct.c_char_p, ct.c_char_p]
 mylib.SetBufferScale.restype = None
+
 mylib.ReadIM7.argtypes = [ct.c_char_p, ct.POINTER(Buffer), \
     ct.POINTER(ct.POINTER(AttributeList))]
 mylib.ReadIM7.restype = ct.c_int
 mylib.ReadIM7.errcheck = imread_errcheck
+
+mylib.DestroyBuffer.argtypes = [ct.POINTER(Buffer),]
+mylib.DestroyBuffer.restype = None
+mylib.DestroyAttributeList.argtypes = [ct.POINTER(ct.POINTER(AttributeList)),]
+mylib.DestroyAttributeList.restype = None
 
 def readim7(filename):
     mybuffer = Buffer()
@@ -326,6 +340,9 @@ def readim7(filename):
     mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(att_pp))
     mybuffer.file = filename
     return mybuffer, att_pp[0]
+
+del_buffer = lambda self: mylib.DestroyBuffer(ct.byref(self))
+del_attributelist = lambda self: mylib.DestroyAttributeList(ct.byref(ct.pointer(self)))
 
 def show_scalar_field(arr, extent=None, ax=None, colorbar=False):
     import matplotlib.pyplot as plt
