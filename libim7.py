@@ -164,6 +164,8 @@ class Buffer(ct.Structure):
     def get_positions(self):
         self.x = self.scaleX(self.header.sizeX, self.vectorGrid)   
         self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
+        if self.scaleY.factor<0:
+            self.y = self.y[::-1]
         self.z = 0 #np.arange(self.header.sizeZ)
         
     def get_blocks(self):
@@ -240,12 +242,28 @@ class Buffer(ct.Structure):
             self.peak = b[13,:,:]
         else:
             raise TypeError(u"Object does not have a vector field format.")
-        self.vx = self.scaleI(vx, 1.)
-        self.vy = self.scaleI(vy, 1.)
-        self.vz = self.scaleI(vz, 1.)
-        if self.scaleY.factor<0:
-            self.vy *= -1
+        
+        # Davis indexing (y,x) => tranpose
+        vx, vy, vz = vx.T, vy.T, vz.T
+        
+        # Davis conception of reversed y-axis
+        if self.scaleY.factor>0:
+            sl = [slice(None), slice(None)]
+        else:
+            sl = [slice(None), slice(None,None, -1)]
+            vy *= -1
+            vz *= -1
+            
+        self.vx = self.scaleI(vx, 1.)[sl]
+        self.vy = self.scaleI(vy, 1.)[sl]
+        self.vz = self.scaleI(vz, 1.)[sl]
         self.vmag = np.sqrt(self.vx**2+self.vy**2+self.vz**2)
+    
+    def delete(self):
+        for key in ('x','y','z','vx','vy','vz','vmag','blocks'):
+            if hasattr(self, key):
+                setattr(self, key,None)
+        del_buffer(self)
     
     def filter(self, fun=None, arrays=[]):
         """
@@ -305,18 +323,19 @@ AttributeList._fields_ = [ \
     ("next", ct.POINTER(AttributeList))]
 
 def imread_errcheck(retval, func, args):
+    arg0 = ct.string_at(args[0])
     if func.__name__!="ReadIM7":
         raise ValueError(u"Wrong function passed: %s." % func.__name__)
     if retval==ImErr['IMREAD_ERR_FILEOPEN']:
-        raise IOError(u"Can't open file %s." % args[0])
+        raise IOError(u"Can't open file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_HEADER']:
-        raise ValueError(u"Incorrect header in file %s." % args[0])
+        raise ValueError(u"Incorrect header in file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_FORMAT']:
-        raise IOError(u"Incorrect format in file %s." % args[0])
+        raise IOError(u"Incorrect format in file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_DATA']:
-        raise ValueError(u"Error while reading data in %s." % args[0])
+        raise ValueError(u"Error while reading data in %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_MEMORY']:
-        raise MemoryError(u"Out of memory while reading %s." % args[0])
+        raise MemoryError(u"Out of memory while reading %s." % arg0)
     else:
         pass
 
