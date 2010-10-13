@@ -388,6 +388,27 @@ def readim7(filename, scale_warn= False):
 del_buffer = lambda self: mylib.DestroyBuffer(ct.byref(self))
 del_attributelist = lambda self: mylib.DestroyAttributeList(ct.byref(ct.pointer(self)))
 
+def save_as_pivmat(filename, buf, att=None):
+    """
+    Save data according to PIVMAT format
+    http://www.fast.u-psud.fr/pivmat/html/pivmat_data.html
+    """
+    savedict = {'namex':'x','namey':'y','namevx':'vx','namevy':'vy'}
+    for key in ('x','y','z','vx','vy','vz'):
+        try:
+            savedict[key] = getattr(buf, key)
+        except KeyError:
+            pass
+        key2 = 'unit'+key
+    savedict['unitx'] = buf.scaleX.unit
+    savedict['unity'] = buf.scaleY.unit
+    savedict['unitvx'] = buf.scaleI.unit
+    savedict['unitvy'] = buf.scaleI.unit
+    savedict['choice'] = buf.block[0,:,:]
+    vysign = {True:'Y axis downward', False:'Y axis upward'}
+    savedict['ysign'] = vysign[buf.scaleY.factor>0]
+    # Still lacks following field: pivmat_version, source, name, sourcename
+    
 def show_scalar_field(arr, extent=None, ax=None, colorbar=False):
     import matplotlib.pyplot as plt
     if ax==None:
