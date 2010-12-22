@@ -202,10 +202,12 @@ class Buffer(ct.Structure):
             vx[choice==2] = b[3,:,:][choice==2]
             vx[choice==3] = b[5,:,:][choice==3]
             vx[choice==4] = b[7,:,:][choice==4]
+            vx[choice==5] = b[7,:,:][choice==5] # post-processed
             vy[choice==1] = b[2,:,:][choice==1]
             vy[choice==2] = b[4,:,:][choice==2]
             vy[choice==3] = b[6,:,:][choice==3]
             vy[choice==4] = b[8,:,:][choice==4]
+            vy[choice==5] = b[8,:,:][choice==5] # post-processed
         elif  h.buffer_format==Formats['FormatsVECTOR_2D_EXTENDED_PEAK']:
             vx = np.zeros(choice.shape, dtype=float)
             vy = np.zeros(choice.shape, dtype=float)
@@ -214,10 +216,12 @@ class Buffer(ct.Structure):
             vx[choice==2] = b[3,:,:][choice==2]
             vx[choice==3] = b[5,:,:][choice==3]
             vx[choice==4] = b[7,:,:][choice==4]
+            vx[choice==5] = b[7,:,:][choice==5] # post-processed
             vy[choice==1] = b[2,:,:][choice==1]
             vy[choice==2] = b[4,:,:][choice==2]
             vy[choice==3] = b[6,:,:][choice==3]
             vy[choice==4] = b[8,:,:][choice==4]
+            vy[choice==5] = b[8,:,:][choice==5] # post-processed
             self.peak = b[9,:,:]
         elif h.buffer_format==Formats['FormatsVECTOR_3D']:
             vx = b[0,:,:]
@@ -231,14 +235,17 @@ class Buffer(ct.Structure):
             vx[choice==2] = b[4,:,:][choice==2]
             vx[choice==3] = b[7,:,:][choice==3]
             vx[choice==4] = b[10,:,:][choice==4]
+            vx[choice==5] = b[10,:,:][choice==5] # post-processed
             vy[choice==1] = b[2,:,:][choice==1]
             vy[choice==2] = b[5,:,:][choice==2]
             vy[choice==3] = b[8,:,:][choice==3]
             vy[choice==4] = b[11,:,:][choice==4]
+            vy[choice==5] = b[11,:,:][choice==5] # post-processed
             vz[choice==1] = b[3,:,:][choice==1]
             vz[choice==2] = b[6,:,:][choice==2]
             vz[choice==3] = b[9,:,:][choice==3]
             vz[choice==4] = b[12,:,:][choice==4]
+            vz[choice==5] = b[12,:,:][choice==5] # post-processed
             self.peak = b[13,:,:]
         else:
             raise TypeError(u"Object does not have a vector field format.")
@@ -390,24 +397,28 @@ del_attributelist = lambda self: mylib.DestroyAttributeList(ct.byref(ct.pointer(
 
 def save_as_pivmat(filename, buf, att=None):
     """
-    Save data according to PIVMAT format
+    Save single file data according to PIVMAT format
     http://www.fast.u-psud.fr/pivmat/html/pivmat_data.html
     """
-    savedict = {'namex':'x','namey':'y','namevx':'vx','namevy':'vy'}
-    for key in ('x','y','z','vx','vy','vz'):
+    dic = {'namex':'x','namey':'y','namevx':'vx','namevy':'vy'}
+    for key in ('x','y','z','vx','vy','vz','name', 'setname', 'source'):
         try:
-            savedict[key] = getattr(buf, key)
-        except KeyError:
-            pass
-        key2 = 'unit'+key
-    savedict['unitx'] = buf.scaleX.unit
-    savedict['unity'] = buf.scaleY.unit
-    savedict['unitvx'] = buf.scaleI.unit
-    savedict['unitvy'] = buf.scaleI.unit
-    savedict['choice'] = buf.block[0,:,:]
+            dic[key] = getattr(buf, key)
+        except AttributeError:
+            dic[key] = buf.__getattr__(key)
+    dic['unitx'] = buf.scaleX.unit.strip('[]')
+    dic['unity'] = buf.scaleY.unit.strip('[]')
+    dic['unitvx'] = buf.scaleI.unit
+    dic['unitvy'] = buf.scaleI.unit
+    dic['choice'] = buf.blocks[0,:,:]
     vysign = {True:'Y axis downward', False:'Y axis upward'}
-    savedict['ysign'] = vysign[buf.scaleY.factor>0]
-    # Still lacks following field: pivmat_version, source, name, sourcename
+    dic['ysign'] = vysign[buf.scaleY.factor>0]
+    
+    dic['history'] = np.zeros((1,), dtype=np.object)
+    dic['pivmat_version'] = 'unknown'
+    # Still lacks following field: sourcename
+    import scipy.io as io
+    io.savemat(filename, dic)
     
 def show_scalar_field(arr, extent=None, ax=None, colorbar=False):
     import matplotlib.pyplot as plt
