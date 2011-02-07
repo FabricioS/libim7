@@ -166,20 +166,30 @@ class Buffer(ct.Structure):
         self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
         if self.scaleY.factor<0:
             self.y = self.y[::-1]
-        self.z = 0 #np.arange(self.header.sizeZ)
+        self.z = 0 #np.arange(self.header.sizeZ)        
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
         h = self.header
         arr = self.get_array()       
-        if h.buffer_format==Formats['FormatsIMAGE']:
-            self.blocks = arr.reshape((h.sizeZ*h.sizeF, h.sizeY, h.sizeX))
-        elif h.buffer_format>=1 and h.buffer_format<=5:
+        if h.buffer_format>=1 and h.buffer_format<=5:
             nblocks = (9, 2, 10, 3, 14)
             nblocks = nblocks[h.buffer_format-1]
             self.blocks = arr.reshape((nblocks, h.sizeY, h.sizeX))
+        else: # h.buffer_format==Formats['FormatsIMAGE']:
+            self.blocks = arr.reshape((h.sizeZ*h.sizeF, h.sizeY, h.sizeX))
+        #else:
+        #    raise TypeError(u"Can't get blocks from this buffer format.")
+    
+    def get_frame(self, idx=0):
+        """
+        Extract the specified frame (index starting from 0).
+        """
+        if idx<self.nf:
+            b = self.blocks
+            return b[idx,...]
         else:
-            raise TypeError(u"Can't get blocks from this buffer format.")
+            raise ValueError('Buffer has no more than %d frames.' % self.nf)
     
     def get_components(self):
         """
