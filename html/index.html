@@ -1,0 +1,237 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Welcome to libim7’s documentation! &mdash; libim7 v1 documentation</title>
+    <link rel="stylesheet" href="static/default.css" type="text/css" />
+    <link rel="stylesheet" href="static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="static/jquery.js"></script>
+    <script type="text/javascript" src="static/underscore.js"></script>
+    <script type="text/javascript" src="static/doctools.js"></script>
+    <link rel="top" title="libim7 v1 documentation" href="#" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">libim7 v1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="welcome-to-libim7-s-documentation">
+<h1>Welcome to libim7&#8217;s documentation!<a class="headerlink" href="#welcome-to-libim7-s-documentation" title="Permalink to this headline">¶</a></h1>
+<p>The libim7 project intends to provide a simple pythonic interface to read Particle Image Velocimetry (PIV) image and vector fields files created by LaVision Davis software.</p>
+<p>It bases on ctypes to build an object-oriented interface to the C library provided by LaVision.</p>
+<div class="section" id="build-and-install">
+<h2>Build and install<a class="headerlink" href="#build-and-install" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p>For non-Windows OSes, the build of the extension is handled by the DistUtils
+mechanisms:</p>
+<div class="highlight-python"><pre>$ cd libim7
+$ ls
+libim7.py  SConstruct  License.txt  setup.cfg  setup.py  src  test
+$ python setup.py build
+$ ls
+build  libim7.py  SConstruct  License.txt  setup.cfg  setup.py  src  test  _im7.so</pre>
+</div>
+<p>The file named _im7.so (or _im7.dynlib on Mac OSes?) contained the Python
+extension for the code provided by LaVision.</p>
+<p>On Windows, one has first to build a shared library file (call it _im7.dll)
+linked against the zlib. The SConstruct file is provided and automates this
+step using the sources in the folder src/:</p>
+<div class="highlight-python"><pre>C:\path\to\libim7\&gt;scons
+C:\path\to\libim7\&gt;python setup.py build</pre>
+</div>
+<p>For Python to be able to find the module, you need to set the path
+(using <tt class="xref py py-func docutils literal"><span class="pre">sys.path()</span></tt> ) or install the library:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="c"># python setup.py install</span>
+</pre></div>
+</div>
+</div></blockquote>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p>Once build, you can import the module named libim7. The entry point is the
+function <a href="#id1"><span class="problematic" id="id2">:function:`libim7.readim7`</span></a> that retrieves the Buffer and the
+AttributeList objects from a given file.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">libim7</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">buf</span><span class="p">,</span> <span class="n">att</span> <span class="o">=</span> <span class="n">libim7</span><span class="o">.</span><span class="n">readim7</span><span class="p">(</span><span class="s">&#39;myfile.im7&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All information accessible from LaVision Software is shown in the AttributeList</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span><span class="p">(</span><span class="n">att</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For an image file, you can get the number of frames and these various frames</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&quot;Number of frames:&quot;</span><span class="p">,</span><span class="n">buf</span><span class="o">.</span><span class="n">nf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">buf</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For velocity field files (for example from LaVision Davis), the various
+components of the velocity field are retrieved and can be manipulated like
+<tt class="xref py py-func docutils literal"><span class="pre">numpy.ndarray()</span></tt> with:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">buf</span><span class="o">.</span><span class="n">x</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">buf</span><span class="o">.</span><span class="n">vx</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="p">[</span><span class="n">buf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">buf</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">buf</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">buf</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">figtitle</span><span class="p">(</span><span class="s">r&quot;$v_x$ (</span><span class="si">%s</span><span class="s">)&quot;</span> <span class="o">%</span> <span class="n">buf</span><span class="o">.</span><span class="n">scaleI</span><span class="o">.</span><span class="n">unit</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div></blockquote>
+</div>
+<div class="section" id="module-libim7">
+<span id="reference-api"></span><h2>Reference API<a class="headerlink" href="#module-libim7" title="Permalink to this headline">¶</a></h2>
+<p>This project intends to provide a simple pythonic interface to read 
+Particle Image Velocimetry (PIV) image and vector fields files created 
+by LaVision Davis software.
+It bases on ctypes to build an object-oriented interface to their C library.</p>
+<dl class="function">
+<dt id="libim7.readim7">
+<tt class="descclassname">libim7.</tt><tt class="descname">readim7</tt><big>(</big><em>filename</em>, <em>scale_warn=False</em><big>)</big><a class="headerlink" href="#libim7.readim7" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read the file created by LaVision software and returns the
+related Buffer and AttributeList objects.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Returns :</th><td class="field-body"><p class="first"><strong>buf</strong> : libim7.Buffer</p>
+<p class="last"><strong>att</strong> : libim7.AttributeList</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="libim7.Buffer">
+<em class="property">class </em><tt class="descclassname">libim7.</tt><tt class="descname">Buffer</tt><a class="headerlink" href="#libim7.Buffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>An object containing either the various frames of an Image file, 
+or the various components of a field (probably the velocity field).</p>
+<p class="rubric">Attributes</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="class">
+<dt id="libim7.AttributeList">
+<em class="property">class </em><tt class="descclassname">libim7.</tt><tt class="descname">AttributeList</tt><a class="headerlink" href="#libim7.AttributeList" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Methods</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr><td><tt class="xref py py-obj docutils literal"><span class="pre">as_dict</span></tt></td>
+<td></td>
+</tr>
+<tr><td><tt class="xref py py-obj docutils literal"><span class="pre">delete</span></tt></td>
+<td></td>
+</tr>
+<tr><td><tt class="xref py py-obj docutils literal"><span class="pre">get_pairs</span></tt></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="libim7.save_as_pivmat">
+<tt class="descclassname">libim7.</tt><tt class="descname">save_as_pivmat</tt><big>(</big><em>filename</em>, <em>buf</em>, <em>att=None</em><big>)</big><a class="headerlink" href="#libim7.save_as_pivmat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save single file data according to PIVMAT format
+<a class="reference external" href="http://www.fast.u-psud.fr/pivmat/html/pivmat_data.html">http://www.fast.u-psud.fr/pivmat/html/pivmat_data.html</a></p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Welcome to libim7&#8217;s documentation!</a><ul>
+<li><a class="reference internal" href="#build-and-install">Build and install</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#module-libim7">Reference API</a><ul>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">libim7 v1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Fabrice Silva.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
