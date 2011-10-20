@@ -5,22 +5,36 @@
 
 """
 """
-import sys,os
+import sys,os,info
+from numpy.distutils.misc_util import Configuration
 from numpy.distutils.core import setup, Extension
 from numpy.distutils.command.build_ext import build_ext
 
-name = 'im7'
-version = 0.1
-
 # Configure C and fortran compilers
-if sys.platform in ('win32', 'cygwin'):
-    ext = []
-else:
-    ext = [Extension('_'+name, 
-        sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
-        libraries=['z',],\
-        define_macros=[('_LINUX', None), ], \
-        extra_compile_args=['-ansi', '-pedantic', '-g']),]
     
-setup(name=name, version=version, \
-    ext_modules=ext)
+def configure(parent_package='', top_path=None):
+    config = Configuration('lib'+info.name, parent_package,top_path)
+    config.add_data_dir('test')
+    if sys.platform not in ('win32', 'cygwin'):
+      config.add_extension('_'+info.name,
+        sources=['src/ReadIM7.cpp', 'src/ReadIMX.cpp'],
+        libraries=['z',],
+        define_macros=[('_LINUX', None), ],
+        extra_compile_args=['-ansi', '-pedantic', '-g'])
+    return config
+    
+    
+setup(configuration=configure,
+  author=info.author, \
+  author_email=info.author_email, \
+  maintainer=info.maintainer, \
+  maintainer_email=info.maintainer_email, \
+  url=info.url, \
+  version=info.version, \
+  license=info.license, \
+  long_description=info.description, \
+  description=info.summary, \
+  platforms=info.platforms, \
+  requires=info.requires, \
+  provides=[info.name], \
+  py_modules=["libim7.py"])

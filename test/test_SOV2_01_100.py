@@ -7,7 +7,7 @@
 """
 
 import sys
-sys.path.append('..')
+sys.path.append('../libim7/')
 import numpy as np
 trace = True
 flags = [True, True, True, True]
@@ -33,9 +33,9 @@ if flags[0]:
     dx = {'extent':(buf1.x[0],buf1.x[-1],buf1.y[0],buf1.y[-1])}
     dx.update(d)
     if trace:
-        Ax[0].imshow(buf1.vx, **dx)
-        Ax[1].imshow(buf1.vy, **dx)
-        Ax[2].imshow(buf1.vz, **dx)
+        Ax[0].imshow(buf1.vx.T, **dx)
+        Ax[1].imshow(buf1.vy.T, **dx)
+        Ax[2].imshow(buf1.vz.T, **dx)
 
 # txt: comma to dot
 if flags[1]:
@@ -65,12 +65,16 @@ if flags[2]:
 # mat
 if flags[3]:
     import scipy.io as io
-    buf4 = io.loadmat('SOV2_01_100_pivmat.mat', squeeze_me=True)['v']
+    buf4 = io.loadmat('SOV2_01_100_pivmat.mat', matlab_compatible=True)['v']
     # Troubles with incorrect x and y vectors...
     if trace:
-        f1.add_subplot(224).imshow(buf4.vx.T[::-1,:], **d)
-        f2.add_subplot(224).imshow(-buf4.vy.T[::-1,:], **d)
-        f3.add_subplot(224).imshow(buf4.vz.T[::-1,:], **d)
+        f1.add_subplot(224).imshow(buf4['vx'][0,0].T[::-1,:], **d)
+        f2.add_subplot(224).imshow(-buf4['vy'][0,0].T[::-1,:], **d)
+        f3.add_subplot(224).imshow(buf4['vz'][0,0].T[::-1,:], **d)
 
+for fig in (f1,f2,f3):
+    lAx = fig.get_axes()
+    for ax in lAx[1:]:
+        ax.get_images()[0].set_clim(lAx[0].get_images()[0].get_clim())
 if trace:
     plt.show()

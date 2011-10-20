@@ -1,0 +1,12 @@
+Installation
+------------
+
+On unixes, it requires the zlib library (will be linked) and a C compiler to be
+able to build LaVision source files.
+Then simply type
+user@computer:libim7$ python setup.py build
+or
+user@computer:libim7$ python setup.py install
+
+
+On windows, as zlib is rarely installed, it is compiled here using scons
