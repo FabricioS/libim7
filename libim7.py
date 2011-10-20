@@ -43,7 +43,7 @@ Formats = {
     'FormatsDOUBLE':-5,   'FormatsFLOAT_VALID':-6, \
     'FormatsIMAGE':0,     'FormatsVECTOR_2D_EXTENDED':1, \
     'FormatsVECTOR_2D':2, 'FormatsVECTOR_2D_EXTENDED_PEAK':3,	\
-	'FormatsVECTOR_3D':4, 'FormatsVECTOR_3D_EXTENDED_PEAK':5,	\
+    'FormatsVECTOR_3D':4, 'FormatsVECTOR_3D_EXTENDED_PEAK':5,	\
     'FormatsCOLOR':-10,   'FormatsRGB_MATRIX':-10, \
     'FormatsRGB_32':-11}
     
@@ -166,7 +166,7 @@ class Buffer(ct.Structure):
         self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
         if self.scaleY.factor<0:
             self.y = self.y[::-1]
-        self.z = 0 #np.arange(self.header.sizeZ)        
+        self.z = 0 #np.arange(self.header.sizeZ)
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
@@ -176,7 +176,9 @@ class Buffer(ct.Structure):
             nblocks = (9, 2, 10, 3, 14)
             nblocks = nblocks[h.buffer_format-1]
             self.blocks = arr.reshape((nblocks, h.sizeY, h.sizeX))
-        else: # h.buffer_format==Formats['FormatsIMAGE']:
+        elif h.buffer_format==Formats['FormatsIMAGE']:
+            self.blocks = arr.reshape((h.sizeF, self.ny, self.nx))
+        else:
             self.blocks = arr.reshape((h.sizeZ*h.sizeF, h.sizeY, h.sizeX))
         #else:
         #    raise TypeError(u"Can't get blocks from this buffer format.")
@@ -267,9 +269,10 @@ class Buffer(ct.Structure):
         if self.scaleY.factor>0:
             sl = [slice(None), slice(None)]
         else:
+            print "im7: inverting axes y and z."
             sl = [slice(None), slice(None,None, -1)]
             vy *= -1
-            vz *= -1
+            #vz *= -1
             
         self.vx = self.scaleI(vx, 1.)[sl]
         self.vy = self.scaleI(vy, 1.)[sl]
