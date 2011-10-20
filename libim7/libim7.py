@@ -83,6 +83,72 @@ class BufferScale(ct.Structure):
         mylib.SetBufferScale(ct.byref(self), dic["factor"], dic["offset"], \
             ct.c_char_p(dic["description"]), ct.c_char_p(dic["unit"]))
 
+class ImageHeaderX(ct.Structure):
+    _fields_ = [ \
+        ("imagetype", ct.c_short),      #0:  (Image_t)
+        ("xstart", ct.c_short),         #2:  start-pos left, not used
+        ("ystart", ct.c_short),         #4:  start-pos top, not used
+        ("extended", ct.c_bool*4),      #6:  reserved
+        ("rows", ct.c_short),           #10: total number of rows, if -1 the real number is stored in longRows
+        ("columns", ct.c_short),        #12: total number of columns, if -1 see longColumns
+        ("image_sub_type", ct.c_short), #14: type of image (int):
+                                        #    (included starting from sc_version 4.2 on)
+                                        #    0 = normal image
+                                        #    1 = PIV vector field with header and 4*2D field rows = 9 * y-size
+                                        #    2 = simple 2D vector field (not used yet)	    rows = 2 * y-size
+                                        #    3 ...
+        ("y_dim", ct.c_short),          #16: size of y-dim (size of x-dim is always = columns), not used
+        ("f_dim", ct.c_short),          #18: size of f-dimension (number of frames)
+        #for image_sub_type 1/2 only:
+        ("vector_grid", ct.c_short),    #20: 1-n = vector data: grid size (included starting from sc_ver 4.2 on)
+        ("ext", ct.c_char*11),          #22: reserved
+        ("version", ct.c_bool),         #33:  e.g. 120 = 1.2	300+ = 3.xx  40-99 = 4.0 bis 9.9
+        ]
+    if 'win' in sys.platform:
+        _fields_ += [ \
+        ("date", ct.c_char*9),          #34
+        ("time", ct.c_char*9)]          #43
+    else:
+        _fields_ += [ \
+        ("date", ct.c_char*8),          #34
+        ("time", ct.c_char*8)]          #43
+    
+    _fields_ += [ \
+        ("xinit", ct.c_short),          #52:  x-scale values
+        ("xa", ct.c_float),             #54
+        ("xb", ct.c_float),             #58
+        ("xdim", ct.c_char*11),         #62
+        ("xunits", ct.c_char*11),       #73
+        ("yinit", ct.c_short),          #84:  y-scale values
+        ("ya", ct.c_float),             #86
+        ("yb", ct.c_float),             #90
+        ("ydim", ct.c_char*11),         #94
+        ("yunits", ct.c_char*11),       #105
+        ("iinit", ct.c_short),          #116:  intensity-scale values
+        ("ia", ct.c_float),             #118
+        ("ib", ct.c_float),             #122
+        ("idim", ct.c_char*11),         #126
+        ("iunits", ct.c_char*11),       #137
+        ("com1", ct.c_char*40),         #148
+        ("com2", ct.c_char*40),         #188
+        ("longRows", ct.c_int),         #228 (large) number of rows, TL 04.02.2000
+        ("longColumns", ct.c_int),      #232: (large) number of columns, TL 04.02.2000
+        ("longZDim", ct.c_int),         #236: (large) number of z-dimension, TL 02.05.00
+        ("reserved", ct.c_char*12),     #240: reserved
+        ("checksum", ct.c_int)]        #252-255: not used
+    
+    def __repr__(self):
+        tmp = "<%s.%s object at %s>\n" % (
+            self.__class__.__module__,
+            self.__class__.__name__, hex(id(self)))
+        for k,v in self._fields_:
+            if k is "reserved": continue
+            try:
+                tmp += "\t%s:\t%i\n" % (k, getattr(self, k))
+            except:
+                pass
+        return tmp
+        
 class ImageHeader7(ct.Structure):
     _fields_ = [ \
         ("version", ct.c_short), \
@@ -97,6 +163,15 @@ class ImageHeader7(ct.Structure):
         ("vector_grid", ct.c_short),  \
         ("extraFlags", ct.c_short), \
         ("reserved", ct.c_byte*(256-30))]
+    
+    def __repr__(self):
+        tmp = "<%s.%s object at %s>\n" % (
+            self.__class__.__module__,
+            self.__class__.__name__, hex(id(self)))
+        for k,v in self._fields_:
+            if k is "reserved": continue
+            tmp += "\t%s:\t%i\n" % (k, getattr(self, k))
+        return tmp
 
 class _Data(ct.Union):
     _fields_ = [("floatArray", ct.POINTER(ct.c_float)), \
@@ -116,12 +191,26 @@ class Buffer(ct.Structure):
         ("scaleI", BufferScale)]
 
     def read_header(self):
-        f = file(self.file, 'rb')
-        tmp = f.read(ct.sizeof(ImageHeader7))
-        f.close()
-        self.header = ImageHeader7()
-        ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
-            ct.sizeof(ImageHeader7))
+        try:
+            f = file(self.file, 'rb')
+            tmp = f.read(ct.sizeof(ImageHeader7))
+            f.close()
+            self.header = ImageHeader7()
+            ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
+                ct.sizeof(ImageHeader7))
+            assert self.header.sizeX==self.nx
+            assert self.header.sizeY==self.ny
+            assert self.header.sizeZ==self.nz
+            assert self.header.sizeF==self.nf
+            self.reader = "ReadIM7"
+        except AssertionError:
+            f = file(self.file, 'rb')
+            tmp = f.read(ct.sizeof(ImageHeaderX))
+            f.close()
+            self.header = ImageHeaderX()
+            ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
+                ct.sizeof(ImageHeaderX))
+            self.reader = "ReadIMX"
     
     def get_array(self):
         """ 
@@ -162,24 +251,25 @@ class Buffer(ct.Structure):
             raise AttributeError(u"Does not have %s atribute" % key)
     
     def get_positions(self):
-        self.x = self.scaleX(self.header.sizeX, self.vectorGrid)   
-        self.y = self.scaleY(self.header.sizeY, self.vectorGrid)
+        self.x = self.scaleX(self.nx, self.vectorGrid)
+        self.y = self.scaleY(self.ny, self.vectorGrid)
         if self.scaleY.factor<0:
             self.y = self.y[::-1]
-        self.z = 0 #np.arange(self.header.sizeZ)
+        self.z = 0
         
     def get_blocks(self):
         " Transforms the concatenated blocks into arrays."
         h = self.header
-        arr = self.get_array()       
-        if h.buffer_format>=1 and h.buffer_format<=5:
+        arr = self.get_array()
+        if (self.reader is "ReadIMX") \
+          or (h.buffer_format==Formats['FormatsIMAGE']):
+            self.blocks = arr.reshape((self.nf, self.ny, self.nx))
+        elif h.buffer_format>=1 and h.buffer_format<=5:
             nblocks = (9, 2, 10, 3, 14)
             nblocks = nblocks[h.buffer_format-1]
-            self.blocks = arr.reshape((nblocks, h.sizeY, h.sizeX))
-        elif h.buffer_format==Formats['FormatsIMAGE']:
-            self.blocks = arr.reshape((h.sizeF, self.ny, self.nx))
+            self.blocks = arr.reshape((nblocks, self.ny, self.nx))
         else:
-            self.blocks = arr.reshape((h.sizeZ*h.sizeF, h.sizeY, h.sizeX))
+            self.blocks = arr.reshape((self.nf*self.nz, self.ny, self.nx))
         #else:
         #    raise TypeError(u"Can't get blocks from this buffer format.")
     
@@ -303,12 +393,7 @@ class Buffer(ct.Structure):
     
     def quiver_xyplane(self, ax=None, sep=1):
         ax = quiver_3d(self.x, self.y, self.vx, self.vy, self.vz, ax, sep)
-    
-    def delete(self):
-        for key in ('x','y','z','vx','vy','vz','vmag','blocks'):
-            if hasattr(self, key):
-                setattr(self, key,None)
-        del_buffer(self)
+
             
 class AttributeList(ct.Structure):
     def __getattr__(self, key):
