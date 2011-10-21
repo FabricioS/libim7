@@ -37,4 +37,4 @@ setup(configuration=configure,
   platforms=info.platforms, \
   requires=info.requires, \
   provides=[info.name], \
-  py_modules=["libim7.py"])
+  packages=["libim7"])
