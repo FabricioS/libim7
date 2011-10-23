@@ -36,6 +36,7 @@ if flags[0]:
         Ax[0].imshow(buf1.vx.T, **dx)
         Ax[1].imshow(buf1.vy.T, **dx)
         Ax[2].imshow(buf1.vz.T, **dx)
+        Ax[0].text(.02, .02, 'VC7', transform=Ax[0].transAxes)
 
 # txt: comma to dot
 if flags[1]:
@@ -46,7 +47,9 @@ if flags[1]:
     dx = {'extent':(x[0],x[-1],y[0],y[-1])}
     dx.update(d)
     if trace:
-        f1.add_subplot(222, **share(1)).imshow(buf2[:,:,2], **dx)
+        ax=f1.add_subplot(222, **share(1))
+        ax.imshow(buf2[:,:,2], **dx)
+        ax.text(.02, .02, 'txt', transform=ax.transAxes)
         f2.add_subplot(222, **share(2)).imshow(buf2[:,:,3], **dx)
         f3.add_subplot(222, **share(3)).imshow(buf2[:,:,4], **dx)
 
@@ -58,7 +61,9 @@ if flags[2]:
     dx = {'extent':(x[0],x[-1],y[0],y[-1])}
     dx.update(d)
     if trace:
-        f1.add_subplot(223, **share(1)).imshow(buf3[:,:,3], **dx)
+        f1.add_subplot(223, **share(1))
+        ax.imshow(buf3[:,:,3], **dx)
+        ax.text(.02, .02, 'dat', transform=ax.transAxes)
         f2.add_subplot(223, **share(2)).imshow(buf3[:,:,4], **dx)
         f3.add_subplot(223, **share(3)).imshow(buf3[:,:,5], **dx)
     
@@ -68,13 +73,16 @@ if flags[3]:
     buf4 = io.loadmat('SOV2_01_100_pivmat.mat', matlab_compatible=True)['v']
     # Troubles with incorrect x and y vectors...
     if trace:
-        f1.add_subplot(224).imshow(buf4['vx'][0,0].T[::-1,:], **d)
+        f1.add_subplot(224)
+        ax.imshow(buf4['vx'][0,0].T[::-1,:], **d)
+        ax.text(.02, .02, 'mat', transform=ax.transAxes)
         f2.add_subplot(224).imshow(-buf4['vy'][0,0].T[::-1,:], **d)
         f3.add_subplot(224).imshow(buf4['vz'][0,0].T[::-1,:], **d)
 
-for fig in (f1,f2,f3):
-    lAx = fig.get_axes()
-    for ax in lAx[1:]:
-        ax.get_images()[0].set_clim(lAx[0].get_images()[0].get_clim())
 if trace:
+    for ind,fig in enumerate((f1,f2,f3)):
+        lAx = fig.get_axes()
+#        for ax in lAx[1:]:
+#            ax.get_images()[0].set_clim(lAx[0].get_images()[0].get_clim())
+        plt.savefig(__file__.replace('.py', '%d.pdf' % ind))
     plt.show()

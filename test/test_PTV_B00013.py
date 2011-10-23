@@ -9,7 +9,7 @@
 import sys
 sys.path.append('../libim7')
 import numpy as np
-trace = True
+trace = False
 flags = [True, True, True, True]
 
 if trace:
@@ -30,4 +30,5 @@ if flags[0]:
         ax.quiver(buf1.x, buf1.y, buf1.vx, buf1.vy, np.sqrt(buf1.vx**2+buf1.vy**2), 
                   scale=1.5)
 if trace:
+    plt.savefig(__file__.replace('.py', '.pdf'))
     plt.show()
