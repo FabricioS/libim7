@@ -144,7 +144,7 @@ class ImageHeaderX(ct.Structure):
         for k,v in self._fields_:
             if k is "reserved": continue
             try:
-                tmp += "\t%s:\t%i\n" % (k, getattr(self, k))
+                tmp += "\t%s:\t%s\n" % (k, getattr(self, k))
             except:
                 pass
         return tmp
@@ -170,7 +170,7 @@ class ImageHeader7(ct.Structure):
             self.__class__.__name__, hex(id(self)))
         for k,v in self._fields_:
             if k is "reserved": continue
-            tmp += "\t%s:\t%i\n" % (k, getattr(self, k))
+            tmp += "\t%s:\t%s\n" % (k, getattr(self, k))
         return tmp
 
 class _Data(ct.Union):
@@ -189,6 +189,14 @@ class Buffer(ct.Structure):
         ("scaleX", BufferScale), \
         ("scaleY", BufferScale), \
         ("scaleI", BufferScale)]
+
+    def __repr__(self):
+        tmp = "<%s.%s object at %s>\n" % (
+            self.__class__.__module__,
+            self.__class__.__name__, hex(id(self)))
+        for k,v in self._fields_:
+            tmp += "\t%s:\t%s\n" % (k, getattr(self, k))
+        return tmp
 
     def read_header(self):
         try:
