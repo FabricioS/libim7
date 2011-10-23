@@ -84,11 +84,12 @@ class BufferScale(ct.Structure):
             ct.c_char_p(dic["description"]), ct.c_char_p(dic["unit"]))
 
 class ImageHeaderX(ct.Structure):
+    _pack_ = 2
     _fields_ = [ \
         ("imagetype", ct.c_short),      #0:  (Image_t)
         ("xstart", ct.c_short),         #2:  start-pos left, not used
         ("ystart", ct.c_short),         #4:  start-pos top, not used
-        ("extended", ct.c_bool*4),      #6:  reserved
+        ("extended", ct.c_ubyte*4),      #6:  reserved
         ("rows", ct.c_short),           #10: total number of rows, if -1 the real number is stored in longRows
         ("columns", ct.c_short),        #12: total number of columns, if -1 see longColumns
         ("image_sub_type", ct.c_short), #14: type of image (int):
@@ -102,7 +103,7 @@ class ImageHeaderX(ct.Structure):
         #for image_sub_type 1/2 only:
         ("vector_grid", ct.c_short),    #20: 1-n = vector data: grid size (included starting from sc_ver 4.2 on)
         ("ext", ct.c_char*11),          #22: reserved
-        ("version", ct.c_bool),         #33:  e.g. 120 = 1.2	300+ = 3.xx  40-99 = 4.0 bis 9.9
+        ("version", ct.c_ubyte),         #33:  e.g. 120 = 1.2	300+ = 3.xx  40-99 = 4.0 bis 9.9
         ]
     if 'win' in sys.platform:
         _fields_ += [ \
@@ -110,8 +111,8 @@ class ImageHeaderX(ct.Structure):
         ("time", ct.c_char*9)]          #43
     else:
         _fields_ += [ \
-        ("date", ct.c_char*8),          #34
-        ("time", ct.c_char*8)]          #43
+        ("date", ct.c_char*9),          #34
+        ("time", ct.c_char*9)]          #43
     
     _fields_ += [ \
         ("xinit", ct.c_short),          #52:  x-scale values
@@ -189,7 +190,7 @@ class Buffer(ct.Structure):
         ("scaleX", BufferScale), \
         ("scaleY", BufferScale), \
         ("scaleI", BufferScale)]
-
+    
     def __repr__(self):
         tmp = "<%s.%s object at %s>\n" % (
             self.__class__.__module__,
@@ -207,9 +208,6 @@ class Buffer(ct.Structure):
             ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
                 ct.sizeof(ImageHeader7))
             assert self.header.sizeX==self.nx
-            assert self.header.sizeY==self.ny
-            assert self.header.sizeZ==self.nz
-            assert self.header.sizeF==self.nf
             self.reader = "ReadIM7"
         except AssertionError:
             f = file(self.file, 'rb')
@@ -275,7 +273,9 @@ class Buffer(ct.Structure):
         elif h.buffer_format>=1 and h.buffer_format<=5:
             nblocks = (9, 2, 10, 3, 14)
             nblocks = nblocks[h.buffer_format-1]
-            self.blocks = arr.reshape((nblocks, self.ny, self.nx))
+            self.blocks = arr.reshape((nblocks, -1, self.nx))
+            self.ny = self.blocks.shape[1]
+            if hasattr(self, 'y'): del self.y
         else:
             self.blocks = arr.reshape((self.nf*self.nz, self.ny, self.nx))
         #else:
@@ -492,10 +492,18 @@ def readim7(filename, scale_warn= False):
             setattr(tmp,'unit', vals[1])
             setattr(tmp,'description', vals[2])
             
+    mybuffer.get_blocks()
     from_att('scaleX')
     from_att('scaleX')
     from_att('scaleY')
     from_att('scaleI')
+    if mybuffer.reader is 'ReadIMX':
+        h = mybuffer.header
+        mybuffer.scaleX = BufferScale(description=h.xdim, unit=h.xunits, 
+            factor=h.xa, offset=h.xb)
+        mybuffer.scaleY = BufferScale(description=h.ydim, unit=h.yunits, 
+            factor=h.ya, offset=h.yb)
+        
     return mybuffer, att
 
 del_buffer = lambda self: mylib.DestroyBuffer(ct.byref(self))
