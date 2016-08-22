@@ -275,6 +275,7 @@ class Buffer(ct.Structure):
             nblocks = nblocks[h.buffer_format-1]
             self.blocks = arr.reshape((nblocks, -1, self.nx))
             self.ny = self.blocks.shape[1]
+            if hasattr(self, 'x'): del self.x
             if hasattr(self, 'y'): del self.y
         else:
             self.blocks = arr.reshape((self.nf*self.nz, self.ny, self.nx))
