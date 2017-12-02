@@ -15,17 +15,17 @@ flags = [True, True, True, True]
 if trace:
     import matplotlib.pyplot as plt
     # Figure1 : vx, 2:vy, 3:vz
-    f1 = plt.figure(1)
-    f2 = plt.figure(2)
-    f3 = plt.figure(3)
+    f1, ax1 = plt.subplots(2, 2, sharex=True, sharey=True, num=1)
+    f2, ax2 = plt.subplots(2, 2, sharex=True, sharey=True, num=2)
+    f3, ax3 = plt.subplots(2, 2, sharex=True, sharey=True, num=3)
+
     f1.suptitle('$V_x$')
     f2.suptitle('$V_y$')
     f3.suptitle('$V_z$')
-    Ax = [f.add_subplot(221) for f in (f1,f2,f3)]
-    share = lambda ind: {'sharex': Ax[ind-1], 'sharey':Ax[ind-1]}
     
 nx, ny = 118, 78
-d = {'interpolation':'nearest', 'vmin':-10, 'vmax':10, 'origin':'lower'}
+d = {'interpolation':'nearest', 'vmin':-10, 'vmax':10,
+     'origin':'lower', 'cmap': plt.cm.RdBu}
 # libim7
 if flags[0]:
     import libim7 as im7
@@ -33,25 +33,26 @@ if flags[0]:
     dx = {'extent':(buf1.x[0],buf1.x[-1],buf1.y[0],buf1.y[-1])}
     dx.update(d)
     if trace:
-        Ax[0].imshow(buf1.vx.T, **dx)
-        Ax[1].imshow(buf1.vy.T, **dx)
-        Ax[2].imshow(buf1.vz.T, **dx)
-        Ax[0].text(.02, .02, 'VC7', transform=Ax[0].transAxes)
+        ax1[0, 0].imshow(buf1.vx.T, **dx)
+        ax2[0, 0].imshow(buf1.vy.T, **dx)
+        ax3[0, 0].imshow(buf1.vz.T, **dx)
+        ax1[0, 0].set_title('libim7 on .vc7')
 
 # txt: comma to dot
 if flags[1]:
-    f = file('SOV2_01_100_davis.txt', 'r')
-    f.readline(); string = f.read(); f.close(); string = string.replace(',', '.')
+    with open('SOV2_01_100_davis.txt', 'r') as f:
+        f.readline()
+        string = f.read()
+    string = string.replace(',', '.')
     buf2 = np.fromstring(string, sep='\t').reshape((ny,nx,5))
     x, y = buf2[:,:,0][0,:], buf2[:,:,1][:,0]
     dx = {'extent':(x[0],x[-1],y[0],y[-1])}
     dx.update(d)
     if trace:
-        ax=f1.add_subplot(222, **share(1))
-        ax.imshow(buf2[:,:,2], **dx)
-        ax.text(.02, .02, 'txt', transform=ax.transAxes)
-        f2.add_subplot(222, **share(2)).imshow(buf2[:,:,3], **dx)
-        f3.add_subplot(222, **share(3)).imshow(buf2[:,:,4], **dx)
+        ax1[0, 1].imshow(buf2[:,:,2], **dx)
+        ax2[0, 1].imshow(buf2[:,:,3], **dx)
+        ax3[0, 1].imshow(buf2[:,:,4], **dx)
+        ax1[0, 1].set_title('np.fromstring on .txt')
 
 # dat
 if flags[2]:
@@ -61,11 +62,10 @@ if flags[2]:
     dx = {'extent':(x[0],x[-1],y[0],y[-1])}
     dx.update(d)
     if trace:
-        f1.add_subplot(223, **share(1))
-        ax.imshow(buf3[:,:,3], **dx)
-        ax.text(.02, .02, 'dat', transform=ax.transAxes)
-        f2.add_subplot(223, **share(2)).imshow(buf3[:,:,4], **dx)
-        f3.add_subplot(223, **share(3)).imshow(buf3[:,:,5], **dx)
+        ax1[1, 0].imshow(buf3[:,:,3], **dx)
+        ax2[1, 0].imshow(buf3[:,:,4], **dx)
+        ax3[1, 0].imshow(buf3[:,:,5], **dx)
+        ax1[1, 0].set_title('np.loadtxt on .dat')
     
 # mat
 if flags[3]:
@@ -73,16 +73,13 @@ if flags[3]:
     buf4 = io.loadmat('SOV2_01_100_pivmat.mat', matlab_compatible=True)['v']
     # Troubles with incorrect x and y vectors...
     if trace:
-        f1.add_subplot(224)
-        ax.imshow(buf4['vx'][0,0].T[::-1,:], **d)
-        ax.text(.02, .02, 'mat', transform=ax.transAxes)
-        f2.add_subplot(224).imshow(-buf4['vy'][0,0].T[::-1,:], **d)
-        f3.add_subplot(224).imshow(buf4['vz'][0,0].T[::-1,:], **d)
+        ax1[1, 1].imshow(buf4['vx'][0,0].T[::-1,:], **dx)
+        ax2[1, 1].imshow(buf4['vy'][0,0].T[::-1,:], **dx)
+        ax3[1, 1].imshow(buf4['vz'][0,0].T[::-1,:], **dx)
+        ax1[1, 1].set_title('loadmat on .mat')
 
 if trace:
     for ind,fig in enumerate((f1,f2,f3)):
-        lAx = fig.get_axes()
-#        for ax in lAx[1:]:
-#            ax.get_images()[0].set_clim(lAx[0].get_images()[0].get_clim())
+        fig.tight_layout()
         plt.savefig(__file__.replace('.py', '%d.pdf' % ind))
     plt.show()

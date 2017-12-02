@@ -33,16 +33,18 @@ for ind, ext in enumerate(lExt[::-1]):
     fname = __file__.replace(".py", ext)
     buf1, att1 = im7.readim7(fname)
     lBuf.append(buf1)
-    dx = {'extent':(buf1.x[0],buf1.x[-1],buf1.y[0],buf1.y[-1])}
+    dx = {'extent':(buf1.x[0], buf1.x[-1], buf1.y[0], buf1.y[-1])}
     dx.update(d)
     if trace:
         im = lAxs[ind].imshow(buf1.get_frame(0), **dx)
-        lAxs[ind].text(.02, .02, fname, transform=lAxs[ind].transAxes)
-        lAxs[ind].set_xlabel(buf1.scaleX.description.replace('\n',' ')+buf1.scaleX.unit)
-        lAxs[ind].set_ylabel(buf1.scaleY.description.replace('\n',' ')+buf1.scaleY.unit)
+        lAxs[ind].text(.02, .02, fname, transform=lAxs[ind].transAxes, color='c')
+        lAxs[ind].set_xlabel(buf1.scaleX.as_label())
+        lAxs[ind].set_ylabel(buf1.scaleY.as_label())
         cb = plt.colorbar(im, ax = lAxs[ind])
-        cb.set_label(buf1.scaleI.description.replace('\n',' ')+buf1.scaleI.unit)
+        cb.set_label(buf1.scaleI.as_label())
+
 if trace:
+    f1.tight_layout()
     plt.savefig(__file__.replace('.py', '.pdf'))
-    plt.close('all')
-    #plt.show()
+    #plt.close('all')
+    plt.show()

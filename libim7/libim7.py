@@ -9,12 +9,12 @@ Particle Image Velocimetry (PIV) image and vector fields files created
 by LaVision Davis software.
 It bases on ctypes to build an object-oriented interface to their C library.
 """
-import sys
+import os, sys, logging
 import numpy as np
 import ctypes as ct
 import numpy.ctypeslib as nct
 
-import os
+# Some magics to find the compiled library
 try:
     path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_im7")
 except NameError:
@@ -22,9 +22,7 @@ except NameError:
     
 if not(sys.platform in ('win32', 'cygwin')):
     path += '.so'
-    mylib = ct.cdll.LoadLibrary(path)
-else:
-    mylib = ct.cdll.LoadLibrary(path)
+mylib = ct.cdll.LoadLibrary(path)
 
 char16 = ct.c_char*16
 word = ct.c_ushort
@@ -49,39 +47,33 @@ Formats = {
     
 class BufferScale(ct.Structure):
     " Linear scaling tranform. "
-    _fields_ = [("factor", ct.c_float), ("offset", ct.c_float),
-                ("description", char16), ("unit", char16)]
-    _fnames_ = map(lambda x: x[0], _fields_)
-    
-    def _get_fdict(self):
-        return dict( \
-            map(lambda x: (x[0], self.__getattribute__(x[0])), self._fields_))
-    _fdict_ = property(_get_fdict)
-    
+    _fields_ = [("factor", ct.c_float),
+                ("offset", ct.c_float),
+                ("description", char16),
+                ("unit", char16)]
+
     def __repr__(self):
-        tmp = self.description + " (%s)" % self.__class__
-        tmp += ":\n\t(%.3f)*n+(%.3f)" %(self.factor, self.offset)
-        if self.unit!="":
-            tmp += " (%s)" % self.unit
+        repr = [object.__repr__(self),]
+        if len(self.description):
+            repr.append(self.description.decode('ascii'))
+        tmp = '(%.3f) + n * (%.3f)' % (self.offset, self.factor)
+        if len(self.unit):
+            tmp += ' %s' % self.unit.decode('ascii')
+        repr.append(tmp)
+        return ' '.join(repr)
+
+    def as_label(self):
+        tmp = ''
+        if len(self.description):
+            tmp += self.description.decode('ascii')
+        if len(self.unit):
+            tmp += ' %s' % self.unit.decode('ascii')
         return tmp
 
     def __call__(self, vector, grid):
-        if (isinstance(vector,int)):
+        if (isinstance(vector, int)):
             vector = np.arange(.5, vector)
-        return vector*self.factor*grid+self.offset
-    
-    def setbufferscale(self, *args, **kwargs):
-        latt = [tmp for tmp in self._fnames_ if not(tmp in kwargs.keys())]
-        dic = self._fdict_.copy()
-        dic.update(kwargs)
-        if len(args)<=len(latt):
-            for ind,val in enumerate(args):
-                dic[latt[ind]] = val
-        else:
-            print args, kwargs
-            raise IOError(u"Too many arguments in _setbufferscale.")
-        mylib.SetBufferScale(ct.byref(self), dic["factor"], dic["offset"], \
-            ct.c_char_p(dic["description"]), ct.c_char_p(dic["unit"]))
+        return self.offset + vector * self.factor * grid
 
 class ImageHeaderX(ct.Structure):
     _pack_ = 2
@@ -139,9 +131,7 @@ class ImageHeaderX(ct.Structure):
         ("checksum", ct.c_int)]        #252-255: not used
     
     def __repr__(self):
-        tmp = "<%s.%s object at %s>\n" % (
-            self.__class__.__module__,
-            self.__class__.__name__, hex(id(self)))
+        tmp = object.__repr__(self)
         for k,v in self._fields_:
             if k is "reserved": continue
             try:
@@ -166,9 +156,7 @@ class ImageHeader7(ct.Structure):
         ("reserved", ct.c_byte*(256-30))]
     
     def __repr__(self):
-        tmp = "<%s.%s object at %s>\n" % (
-            self.__class__.__module__,
-            self.__class__.__name__, hex(id(self)))
+        tmp = object.__repr__(self)
         for k,v in self._fields_:
             if k is "reserved": continue
             tmp += "\t%s:\t%s\n" % (k, getattr(self, k))
@@ -192,31 +180,58 @@ class Buffer(ct.Structure):
         ("scaleI", BufferScale)]
     
     def __repr__(self):
-        tmp = "<%s.%s object at %s>\n" % (
-            self.__class__.__module__,
-            self.__class__.__name__, hex(id(self)))
+        tmp = object.__repr__(self)
         for k,v in self._fields_:
             tmp += "\t%s:\t%s\n" % (k, getattr(self, k))
         return tmp
 
     def read_header(self):
         try:
-            f = file(self.file, 'rb')
-            tmp = f.read(ct.sizeof(ImageHeader7))
-            f.close()
+            with open(self.file, 'rb') as f:
+                tmp = f.read(ct.sizeof(ImageHeader7))
             self.header = ImageHeader7()
             ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
                 ct.sizeof(ImageHeader7))
             assert self.header.sizeX==self.nx
             self.reader = "ReadIM7"
         except AssertionError:
-            f = file(self.file, 'rb')
-            tmp = f.read(ct.sizeof(ImageHeaderX))
-            f.close()
+            with open(self.file, 'rb') as f:
+                tmp = f.read(ct.sizeof(ImageHeaderX))
             self.header = ImageHeaderX()
             ct.memmove(ct.addressof(self.header), ct.c_char_p(tmp), \
                 ct.sizeof(ImageHeaderX))
             self.reader = "ReadIMX"
+
+    def set_scales_from_attributelist(self, att):
+        logging.info('Setting scales from attributes')
+        missing = []
+        for el in 'XYI':
+            inbuf = getattr(self, 'scale%s' % el)
+            inatt = att.get('_SCALE_%s' % el, None)
+            if inatt is None:
+                logging.warn('_SCALE_%s not in attribute list.' % el)
+                missing.append(el)
+                continue
+            if inatt[-1] == '\n':
+                inatt = inatt[:-1]
+            values = inatt.replace(' ', '\n').split('\n')
+            inbuf.factor = float(values[0])
+            inbuf.offset = float(values[1])
+            inbuf.unit = values[2].encode('ascii')[:16]
+            inbuf.description = values[3].encode('ascii')[:16]
+            logging.info('Scale %s:' % el, inbuf)
+        return missing
+
+    def set_scales_from_header(self):
+        logging.info('Setting scales from header')
+        header = self.header
+        for el in 'xyi':
+            inbuf = getattr(self, 'scale%s' % el.upper())
+            inbuf.factor = getattr(header, '%sa' % el)
+            inbuf.offset = getattr(header, '%sb' % el)
+            inbuf.unit = getattr(header, '%sunits' % el)[:16]
+            inbuf.description = getattr(header, '%sdim' % el)[:16]
+            logging.info('Scale %s:' % el, inbuf)
     
     def get_array(self):
         """ 
@@ -254,7 +269,7 @@ class Buffer(ct.Structure):
             self.get_components()
             return self.__dict__[key]
         else:
-            raise AttributeError(u"Does not have %s atribute" % key)
+            raise AttributeError("Does not have %s atribute" % key)
     
     def get_positions(self):
         self.x = self.scaleX(self.nx, self.vectorGrid)
@@ -359,7 +374,7 @@ class Buffer(ct.Structure):
             vz[choice==5] = b[12,:,:][choice==5] # post-processed
             self.peak = b[13,:,:]
         else:
-            raise TypeError(u"Object does not have a vector field format.")
+            raise TypeError("Object does not have a vector field format.")
         
         # Davis indexing (y,x) => tranpose
         vx, vy, vz = vx.T, vy.T, vz.T
@@ -368,7 +383,7 @@ class Buffer(ct.Structure):
         if self.scaleY.factor>0:
             sl = [slice(None), slice(None)]
         else:
-            print "im7: inverting axes y and z."
+            logging.info("im7: inverting axes y and z.")
             sl = [slice(None), slice(None,None, -1)]
             vy *= -1
             #vz *= -1
@@ -381,8 +396,8 @@ class Buffer(ct.Structure):
     def delete(self):
         for key in ('x','y','z','vx','vy','vz','vmag','blocks'):
             if hasattr(self, key):
-                setattr(self, key,None)
-        del_buffer(self)
+                setattr(self, key, None)
+        mylib.DestroyBuffer(ct.byref(self))
     
     def filter(self, fun=None, arrays=[]):
         """
@@ -397,59 +412,51 @@ class Buffer(ct.Structure):
             if tmp.shape == self.vx.shape:
                 lArrays.append(tmp)
             else:
-                raise ValueError(u'Wrong shape for additional argument.')
-        return map(ff, lArrays)
+                raise ValueError('Wrong shape for additional argument.')
+        return [ff(el) for el in lArrays]
     
     def quiver_xyplane(self, ax=None, sep=1):
         ax = quiver_3d(self.x, self.y, self.vx, self.vy, self.vz, ax, sep)
 
             
-class AttributeList(ct.Structure):
-    def __getattr__(self, key):
-        if key=='pairs':
-            self.get_pairs()
-            return self.pairs
-        if key=='dict':
-            return self.as_dict()
-        else:
-            raise AttributeError(u"Does not have %s atribute" % key)
-            
-    def get_pairs(self):
-        att = self
-        self.pairs = []
-        while att!=0:
-            try:
-                self.pairs.append((att.name, att.value))
-                att = att.next[0]
-            except ValueError:
-                break
-    
-    def as_dict(self):
-        self.get_pairs()
-        return dict(self.pairs)
-        
-    def delete(self):
-        del_attributelist(self)
-        
-AttributeList._fields_ = [ \
+class AttributeNode(ct.Structure):
+    pass
+ 
+AttributeNode._fields_ = [ \
     ("name", ct.c_char_p), \
     ("value", ct.c_char_p), \
-    ("next", ct.POINTER(AttributeList))]
+    ("next", ct.POINTER(AttributeNode))]
+
+def AttributeNodes2AttributeList(att0, delete=False):
+    att = att0[0]
+    d = {}
+    logging.debug("In AttributeNodes2AttributeList")
+    while att is not None and att.name is not None:
+        logging.debug(len(d), att.name, att.value)
+        try:
+            value = att.value.decode('ascii')
+        except UnicodeDecodeError:
+            value = att.value
+        d[att.name.decode('ascii')] = value
+        att = att.next[0]
+    if delete:
+        mylib.DestroyAttributeList(ct.byref(ct.pointer(att0)))
+    return d
 
 def imread_errcheck(retval, func, args):
     arg0 = ct.string_at(args[0])
     if func.__name__!="ReadIM7":
-        raise ValueError(u"Wrong function passed: %s." % func.__name__)
+        raise ValueError("Wrong function passed: %s." % func.__name__)
     if retval==ImErr['IMREAD_ERR_FILEOPEN']:
-        raise IOError(u"Can't open file %s." % arg0)
+        raise IOError("Can't open file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_HEADER']:
-        raise ValueError(u"Incorrect header in file %s." % arg0)
+        raise ValueError("Incorrect header in file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_FORMAT']:
-        raise IOError(u"Incorrect format in file %s." % arg0)
+        raise IOError("Incorrect format in file %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_DATA']:
-        raise ValueError(u"Error while reading data in %s." % arg0)
+        raise ValueError("Error while reading data in %s." % arg0)
     elif retval==ImErr['IMREAD_ERR_MEMORY']:
-        raise MemoryError(u"Out of memory while reading %s." % arg0)
+        raise MemoryError("Out of memory while reading %s." % arg0)
     else:
         pass
 
@@ -458,57 +465,31 @@ mylib.SetBufferScale.argtypes = [ct.POINTER(BufferScale), \
 mylib.SetBufferScale.restype = None
 
 mylib.ReadIM7.argtypes = [ct.c_char_p, ct.POINTER(Buffer), \
-    ct.POINTER(ct.POINTER(AttributeList))]
+    ct.POINTER(ct.POINTER(AttributeNode))]
 mylib.ReadIM7.restype = ct.c_int
 mylib.ReadIM7.errcheck = imread_errcheck
 
 mylib.DestroyBuffer.argtypes = [ct.POINTER(Buffer),]
 mylib.DestroyBuffer.restype = None
-mylib.DestroyAttributeList.argtypes = [ct.POINTER(ct.POINTER(AttributeList)),]
+mylib.DestroyAttributeList.argtypes = [ct.POINTER(ct.POINTER(AttributeNode)),]
 mylib.DestroyAttributeList.restype = None
 
 def readim7(filename, scale_warn= False):
     mybuffer = Buffer()
-    att_pp = ct.pointer(AttributeList())
-    mylib.ReadIM7(ct.c_char_p(filename), ct.byref(mybuffer), ct.byref(att_pp))
+    att_pp = ct.pointer(AttributeNode())
+    mylib.ReadIM7(ct.c_char_p(filename.encode(sys.getfilesystemencoding())),
+                  ct.byref(mybuffer), ct.byref(att_pp))
     mybuffer.file = filename
-    att = att_pp[0]
-    def from_att(field):
-        tmp = getattr(mybuffer,field)
-        if getattr(tmp,'factor')==0 and getattr(tmp,'offset')==0:
-            if scale_warn:
-                print(u'%s not set in %s' % (field, filename))
-            if field=='scaleX':
-                attv = att.as_dict()['_SCALE_X']
-            elif field=='scaleY':
-                attv = att.as_dict()['_SCALE_Y']
-            elif field=='scaleI':
-                attv = att.as_dict()['_SCALE_I']
-            else:
-                return
-            vals = attv.split(' ')
-            setattr(tmp,'factor', float(vals[0]))
-            vals = vals[1].split('\n')
-            setattr(tmp,'offset', float(vals[0]))
-            setattr(tmp,'unit', vals[1])
-            setattr(tmp,'description', vals[2])
-            
     mybuffer.get_blocks()
-    from_att('scaleX')
-    from_att('scaleX')
-    from_att('scaleY')
-    from_att('scaleI')
+            
+    att = AttributeNodes2AttributeList(att_pp)
     if mybuffer.reader is 'ReadIMX':
-        h = mybuffer.header
-        mybuffer.scaleX = BufferScale(description=h.xdim, unit=h.xunits, 
-            factor=h.xa, offset=h.xb)
-        mybuffer.scaleY = BufferScale(description=h.ydim, unit=h.yunits, 
-            factor=h.ya, offset=h.yb)
+        mybuffer.set_scales_from_header()
+    else:
+        mybuffer.set_scales_from_attributelist(att)
         
     return mybuffer, att
 
-del_buffer = lambda self: mylib.DestroyBuffer(ct.byref(self))
-del_attributelist = lambda self: mylib.DestroyAttributeList(ct.byref(ct.pointer(self)))
 
 def save_as_pivmat(filename, buf, att=None):
     """
