@@ -8,7 +8,7 @@ Files provided by Colin Brosseau (B0003.*->test_IMX.*)
 """
 
 import sys
-sys.path.append('../libim7')
+sys.path.append('..')
 import numpy as np
 import libim7 as im7
 

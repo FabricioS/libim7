@@ -7,7 +7,7 @@
 """
 
 import sys
-sys.path.append('../libim7')
+sys.path.append('..')
 import numpy as np
 trace = False
 flags = [True, True, True, True]
